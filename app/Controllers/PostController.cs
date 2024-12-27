@@ -81,111 +81,120 @@ namespace app.Controllers
         }
 
 
+
         // GET: /Post/{id}
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetPostById(string id)
+        [HttpGet("{postId}")]
+        public async Task<IActionResult> GetPostById(string postId)
         {
             try
             {
-                var query = @"
-                    MATCH (p:Post {postId: $postId})<-[:CREATED]-(u:User)
-                    RETURN p, u";
+                // Upit za pronalaženje posta na osnovu postId
+                var query = _graphClient.Cypher
+                    .Match("(p:Post)")
+                    .Where((Post p) => p.postId == postId)
+                    .Return(p => p.As<Post>());
 
-                var result = await _graphClient.Cypher
-                    .WithParam("postId", id)
-                    .Return((p, u) => new
-                    {
-                        Post = p.As<Post>(),
-                        Author = u.As<User>()
-                    })
-                    .ResultsAsync;
+                // Izvršavanje upita i dobijanje rezultata
+                var posts = await query.ResultsAsync;
 
-                var post = result.FirstOrDefault();
+                // Proverite da li je post pronađen
+                var post = posts.FirstOrDefault(); // Uzima prvi post ili null ako nije pronađen
+
                 if (post == null)
                 {
-                    return NotFound(new { Message = "Post not found" });
+                    return NotFound($"Post with ID {postId} not found.");
                 }
 
-              //  post.Post.author = post.Author;
-
-                return Ok(post.Post);
+                return Ok(post); // Vraća post sa statusom 200 OK
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Error = ex.Message });
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
+
         // GET: /Post
         [HttpGet]
-        public async Task<IActionResult> GetAllPosts()
+        public async Task<IActionResult> GetPosts([FromQuery] string userId)
         {
             try
             {
-                var query = @"
-                    MATCH (p:Post)<-[:CREATED]-(u:User)
-                    RETURN p, u";
-
-                var results = await _graphClient.Cypher
-                    .Return((p, u) => new
-                    {
-                        Post = p.As<Post>(),
-                        Author = u.As<User>()
-                    })
-                    .ResultsAsync;
-
-                var posts = new List<Post>();
-
-                foreach (var result in results)
+                // Ako je userId prosleđen, filtriraj postove tog korisnika
+                if (!string.IsNullOrEmpty(userId))
                 {
-                  //  result.Post.author = result.Author;
-                    posts.Add(result.Post);
+                    var query = _graphClient.Cypher
+                        .Match("(u:User)-[:PUBLISHED]->(p:Post)")
+                        .Where((User u) => u.UserId == userId)
+                        .Return(p => p.As<Post>());
+
+                    var posts = await query.ResultsAsync;
+
+                    return Ok(posts); // Vraća sve postove koji pripadaju korisniku sa userId
                 }
 
-                return Ok(posts);
+                // Ako userId nije prosleđen, vrati sve postove
+                var allPostsQuery = _graphClient.Cypher
+                    .Match("(p:Post)")
+                    .Return(p => p.As<Post>());
+
+                var allPosts = await allPostsQuery.ResultsAsync;
+
+                return Ok(allPosts); // Vraća sve postove
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Error = ex.Message });
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
 
         // PUT: /Post/{id}
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdatePost(string id, [FromBody] Post updatedPost)
+        [HttpPut("{postId}")]
+        public async Task<IActionResult> UpdatePost(string postId, [FromBody] Post updatedPost)
         {
             try
             {
-                var query = @"
-                    MATCH (p:Post {postId: $postId})
-                    SET p.caption = $caption, p.imageURL = $imageURL
-                    RETURN p";
+                // Prvo, proverite da li post postoji
+                var query = _graphClient.Cypher
+                    .Match("(p:Post)")
+                    .Where((Post p) => p.postId == postId)
+                    .Return(p => p.As<Post>());
 
-                var parameters = new
-                {
-                    postId = id,
-                    caption = updatedPost.caption,
-                    imageURL = updatedPost.imageURL
-                };
+                var posts = await query.ResultsAsync;
+                var post = posts.FirstOrDefault();
 
-                var result = await _graphClient.Cypher
-                    .WithParams(parameters)
-                    .Return(p => p.As<Post>())
-                    .ResultsAsync;
-
-                var post = result.FirstOrDefault();
                 if (post == null)
                 {
-                    return NotFound(new { Message = "Post not found" });
+                    return NotFound($"Post with ID {postId} not found.");
                 }
 
-                return Ok(new { Message = "Post updated successfully", Post = post });
+                // Ažuriranje svojstava postojećeg posta sa novim podacima
+                post.caption = updatedPost.caption ?? post.caption;
+                post.imageURL = updatedPost.imageURL ?? post.imageURL;
+                post.author = updatedPost.author ?? post.author;
+                post.createdAt = updatedPost.createdAt != default ? updatedPost.createdAt : post.createdAt;
+                post.likeCount = updatedPost.likeCount > 0 ? updatedPost.likeCount : post.likeCount;
+
+                // Ažuriranje u bazi podataka
+                await _graphClient.Cypher
+                    .Match("(p:Post)")
+                    .Where((Post p) => p.postId == postId)
+                    .Set("p.caption = {caption}, p.imageURL = {imageURL}, p.author = {author}, p.createdAt = {createdAt}, p.likeCount = {likeCount}")
+                    .WithParam("caption", post.caption)
+                    .WithParam("imageURL", post.imageURL)
+                    .WithParam("author", post.author)
+                    .WithParam("createdAt", post.createdAt)
+                    .WithParam("likeCount", post.likeCount)
+                    .ExecuteWithoutResultsAsync();
+
+                return Ok(post); // Vraća ažurirani post sa statusom 200 OK
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Error = ex.Message });
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+
 
         // DELETE: /Post/{id}
         [HttpDelete("{id}")]
@@ -193,20 +202,37 @@ namespace app.Controllers
         {
             try
             {
-                var query = @"
-                    MATCH (p:Post {postId: $postId})
-                    DETACH DELETE p";
-
-                await _graphClient.Cypher
+                // Proverite da li post postoji
+                var postExists = await _graphClient.Cypher
+                    .Match("(p:Post {postId: $postId})")
                     .WithParam("postId", id)
+                    .Return<int>("count(p)")  // Broj postova sa datim postId
+                    .ResultsAsync;
+
+                if (postExists.Single() == 0)
+                {
+                    return NotFound(new { message = "Post not found" });
+                }
+
+                // Ako post postoji, obrišite ga
+                var query = _graphClient.Cypher
+                    .Match("(p:Post {postId: $postId})")
+                    .WithParam("postId", id)
+                    .Delete("p")  // Briše čvor posta
                     .ExecuteWithoutResultsAsync();
 
-                return Ok(new { Message = "Post deleted successfully" });
+                await query;
+
+                return NoContent();  // Vraća 204 status kod kada je resurs uspešno obrisan
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { Error = ex.Message });
             }
         }
+
     }
 }
+
+
+

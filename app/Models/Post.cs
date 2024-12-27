@@ -11,8 +11,8 @@ namespace app.Models
         public String imageURL { get; set; }
         public String caption { get; set; }
 
-        [JsonConverter(typeof(LocalDateTimeConverter))]
-        public LocalDateTime? createdAt { get; set; }
+        
+        public DateTime createdAt { get; set; }
         public String author { get; set; }
         public List<User> likes { get; set; }=new List<User>();
         public int likeCount { get; set; }
@@ -20,7 +20,7 @@ namespace app.Models
         public Post()
         {
         }
-        public Post(String postId, String imageURL, String caption, LocalDateTime createdAt, String author, int lk)
+        public Post(String postId, String imageURL, String caption, DateTime createdAt, String author, int lk)
         {
             this.postId = postId;
             this.imageURL = imageURL;
@@ -45,17 +45,4 @@ namespace app.Models
 
     }
 
-}
-public class LocalDateTimeConverter : JsonConverter<LocalDateTime>
-{
-    public override LocalDateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-    {
-        var dateTime = DateTime.Parse(reader.GetString());
-        return new LocalDateTime(dateTime.Year, dateTime.Month, dateTime.Day, dateTime.Hour, dateTime.Minute, dateTime.Second);
-    }
-
-    public override void Write(Utf8JsonWriter writer, LocalDateTime value, JsonSerializerOptions options)
-    {
-        writer.WriteStringValue(value.ToString());
-    }
 }
