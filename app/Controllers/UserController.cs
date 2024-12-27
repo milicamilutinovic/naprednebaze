@@ -40,16 +40,16 @@ namespace app.Controllers
 
                 // Create a new user node in the database
                 var query = _graphClient.Cypher
-                    .Create("(u:User {userId: $userId, username: $username, fullName: $fullName, email: $email, passwordHash: $passwordHash, profilePicture: $profilePicture, bio: $bio, createdAt: $createdAt, isAdmin: $isAdmin})")
-                    .WithParam("userId", user.UserId)
-                    .WithParam("username", user.Username)
-                    .WithParam("fullName", user.FullName)
-                    .WithParam("email", user.Email)
-                    .WithParam("passwordHash", user.PasswordHash)
-                    .WithParam("profilePicture", user.ProfilePicture)
-                    .WithParam("bio", user.Bio)
-                    .WithParam("createdAt", user.CreatedAt)
-                    .WithParam("isAdmin", user.IsAdmin)
+                    .Create("(u:User {userId: $UserId, username: $Username, fullName: $FullName, email: $Email, passwordHash: $PasswordHash, profilePicture: $ProfilePicture, bio: $Bio, createdAt: $CreatedAt, isAdmin: $IsAdmin})")
+                    .WithParam("UserId", user.UserId)
+                    .WithParam("Username", user.Username)
+                    .WithParam("FullName", user.FullName)
+                    .WithParam("Email", user.Email)
+                    .WithParam("PasswordHash", user.PasswordHash)
+                    .WithParam("ProfilePicture", user.ProfilePicture)
+                    .WithParam("Bio", user.Bio)
+                    .WithParam("CreatedAt", user.CreatedAt)
+                    .WithParam("IsAdmin", user.IsAdmin)
                     .Return<string>("u.UserId");
 
                 await query.ExecuteWithoutResultsAsync();
@@ -63,32 +63,45 @@ namespace app.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
-    
 
 
-    // GET: api/User/{id}
-    [HttpGet("{id}")]
+
+        // GET: api/User/{id}
+        [HttpGet("{id}")]
         public async Task<IActionResult> GetUser(string id)
         {
             try
             {
-                    var result = await _graphClient.Cypher
-         .Match("(u:User {userId: $userId})") // Ispravno MATCH
-         .WithParams(new { userId = id })
-         .Return(u => u.As<User>())  // Return the User object directly
-         .ResultsAsync;
+                // Upit za traženje korisnika sa određenim UserId
+                var query = _graphClient.Cypher
+                    .Match("(u:User {userId: $userId})")  // Tražimo korisnika sa odgovarajućim UserId
+                    .WithParam("userId", id)  // Prosleđujemo parametar sa UserId
+                    .Return(u => u.As<User>())  // Vraćamo korisničke podatke
+                    .ResultsAsync;
 
-                    if (result == null || !result.Any())
+                // Izvršavamo upit
+                var result = await query;
+                var user = result.First();
+
+                // Ako nije pronađen korisnik, vraćamo NotFound
+                if (result == null || !result.Any())
+                {
+                    Console.WriteLine("No user found in the database");
+                }
+                else
+                {
+                    foreach (var u in result)
                     {
-                        return NotFound(new { message = "User not found" });
+                        Console.WriteLine($"User found: {u.UserId} - {u.Username}");
                     }
+                }
 
-                    // Vraćanje korisnika
-                    var user = result.First();
-                    return Ok(user);
+                // Vraćamo korisnika ako je pronađen
+                return Ok(user);
             }
             catch (Exception ex)
             {
+                // U slučaju greške, vraćamo 500 status sa greškom
                 return StatusCode(500, new { Error = ex.Message });
             }
         }
@@ -99,13 +112,28 @@ namespace app.Controllers
         {
             try
             {
-                var query = "MATCH (u:User {userId: $userId}) DETACH DELETE u";
-                await _graphClient.Cypher
-                    .WithParams(new { userId = id })
-                    .Match(query)
+                // Proverite da li korisnik postoji
+                var userExists = await _graphClient.Cypher
+                    .Match("(u:User {userId: $userId})")
+                    .WithParam("userId", id)
+                    .Return<int>("count(u)")  // Broj korisnika sa datim userId
+                    .ResultsAsync;
+
+                if (userExists.Single() == 0)
+                {
+                    return NotFound(new { message = "User not found" });
+                }
+
+                // Ako korisnik postoji, obrišite ga
+                var query = _graphClient.Cypher
+                    .Match("(u:User {userId: $userId})")
+                    .WithParam("userId", id)
+                    .Delete("u")  // Briše čvor korisnika
                     .ExecuteWithoutResultsAsync();
 
-                return Ok(new { Message = "User deleted successfully" });
+                await query;
+
+                return NoContent();  // Vraća 204 status kod kada je resurs uspešno obrisan
             }
             catch (Exception ex)
             {
@@ -117,44 +145,48 @@ namespace app.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateUser(string id, [FromBody] User user)
         {
+            if (user == null)
+            {
+                return BadRequest("User data is required.");
+            }
+
             try
             {
-                var query = @"
-                    MATCH (u:User {userId: $userId})
-                    SET u.username = $username,
-                        u.fullName = $fullName,
-                        u.email = $email,
-                        u.passwordHash = $passwordHash,
-                        u.profilePicture = $profilePicture,
-                        u.bio = $bio,
-                        u.isAdmin = $isAdmin
-                    RETURN u";
-
-                var parameters = new
-                {
-                    userId = id,
-                    username = user.Username,
-                    fullName = user.FullName,
-                    email = user.Email,
-                    passwordHash = user.PasswordHash,
-                    profilePicture = user.ProfilePicture,
-                    bio = user.Bio,
-                    isAdmin = user.isAdmin()
-                };
-
-                var result = await _graphClient.Cypher
-                    .WithParams(parameters)
-                    .Match(query)
-                    .Return(u => u.As<INode>())
+                // Prvo proverite da li korisnik postoji u bazi
+                var userExists = await _graphClient.Cypher
+                    .Match("(u:User {userId: $userId})")
+                    .WithParam("userId", id)
+                    .Return<int>("count(u)")  // Broj korisnika sa datim userId
                     .ResultsAsync;
 
-                var updatedUser = result.SingleOrDefault();
-                if (updatedUser == null)
+                if (userExists.Single() == 0)
                 {
-                    return NotFound(new { Message = "User not found" });
+                    return NotFound(new { message = "User not found" });
                 }
 
-                return Ok(updatedUser.Properties);
+                // Ažuriranje podataka korisnika
+                var query = _graphClient.Cypher
+                    .Match("(u:User {userId: $userId})")
+                    .WithParam("userId", id)
+                    .Set("u.username = $Username, u.fullName = $FullName, u.email = $Email, u.passwordHash = $PasswordHash, u.profilePicture = $ProfilePicture, u.bio = $Bio, u.isAdmin = $IsAdmin")
+                    .WithParam("Username", user.Username)
+                    .WithParam("FullName", user.FullName)
+                    .WithParam("Email", user.Email)
+                    .WithParam("PasswordHash", user.PasswordHash)
+                    .WithParam("ProfilePicture", user.ProfilePicture)
+                    .WithParam("Bio", user.Bio)
+                    .WithParam("IsAdmin", user.IsAdmin)
+                    .Return<string>("u.userId")  // Vraća userId korisnika
+                    .ResultsAsync;
+
+                var updatedUser = query.Result.FirstOrDefault();
+
+                if (updatedUser == null)
+                {
+                    return StatusCode(500, new { message = "User update failed" });
+                }
+
+                return Ok(new { message = "User updated successfully", userId = updatedUser });
             }
             catch (Exception ex)
             {
@@ -162,4 +194,4 @@ namespace app.Controllers
             }
         }
     }
-}
+ }
