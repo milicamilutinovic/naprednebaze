@@ -22,76 +22,70 @@ namespace app.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateUser([FromBody] User user)
         {
+            if (user == null)
+            {
+                return BadRequest("User data is required.");
+            }
+
+            // You can add more validation if needed
+            if (string.IsNullOrEmpty(user.Username) || string.IsNullOrEmpty(user.Email))
+            {
+                return BadRequest("Username and Email are required.");
+            }
+
             try
             {
-                // Generate a new userId if it is not provided
-                if (string.IsNullOrEmpty(user.UserId))
-                {
-                    user.UserId = Guid.NewGuid().ToString(); // Generates a unique userId
-                }
+                // Generate a unique UserId
+                user.UserId = Guid.NewGuid().ToString();
 
-                var query = @"
-            CREATE (u:User {
-                userId: $userId,
-                username: $username,
-                fullName: $fullName,
-                email: $email,
-                passwordHash: $passwordHash,
-                profilePicture: $profilePicture,
-                bio: $bio,
-                createdAt: $createdAt,
-                isAdmin: $isAdmin
-            })";
+                // Create a new user node in the database
+                var query = _graphClient.Cypher
+                    .Create("(u:User {userId: $userId, username: $username, fullName: $fullName, email: $email, passwordHash: $passwordHash, profilePicture: $profilePicture, bio: $bio, createdAt: $createdAt, isAdmin: $isAdmin})")
+                    .WithParam("userId", user.UserId)
+                    .WithParam("username", user.Username)
+                    .WithParam("fullName", user.FullName)
+                    .WithParam("email", user.Email)
+                    .WithParam("passwordHash", user.PasswordHash)
+                    .WithParam("profilePicture", user.ProfilePicture)
+                    .WithParam("bio", user.Bio)
+                    .WithParam("createdAt", user.CreatedAt)
+                    .WithParam("isAdmin", user.IsAdmin)
+                    .Return<string>("u.UserId");
 
-                var parameters = new
-                {
-                    userId = user.UserId,
-                    username = user.Username,
-                    fullName = user.FullName,
-                    email = user.Email,
-                    passwordHash = user.PasswordHash,
-                    profilePicture = user.ProfilePicture,
-                    bio = user.Bio,
-                    createdAt = user.CreatedAt,
-                    isAdmin = user.IsAdmin
-                };
+                await query.ExecuteWithoutResultsAsync();
 
-                // Execute the query to create the user in the Neo4j database
-                await _graphClient.Cypher
-                    .WithParams(parameters)
-                    .Create(query)
-                    .ExecuteWithoutResultsAsync();
-
-                // Return the created user data as a response
-                return Ok(new { Message = "User created successfully", User = user });
+                // Return a response with the created UserId
+                return CreatedAtAction(nameof(CreateUser), new { id = user.UserId }, user);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Error = ex.Message });
+                // Handle any exceptions (like connection issues, etc.)
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+    
 
 
-        // GET: api/User/{id}
-        [HttpGet("{id}")]
+    // GET: api/User/{id}
+    [HttpGet("{id}")]
         public async Task<IActionResult> GetUser(string id)
         {
             try
             {
-                var query = "MATCH (u:User {userId: $userId}) RETURN u";
-                var result = await _graphClient.Cypher
-                    .WithParams(new { userId = id })
-                    .Match(query)
-                    .Return(u => u.As<INode>())  // Return the node directly
-                    .ResultsAsync;
+                    var result = await _graphClient.Cypher
+         .Match("(u:User {userId: $userId})") // Ispravno MATCH
+         .WithParams(new { userId = id })
+         .Return(u => u.As<User>())  // Return the User object directly
+         .ResultsAsync;
 
-                var user = result.SingleOrDefault();
-                if (user == null)
-                {
-                    return NotFound(new { Message = "User not found" });
-                }
+                    if (result == null || !result.Any())
+                    {
+                        return NotFound(new { message = "User not found" });
+                    }
 
-                return Ok(user.Properties);
+                    // Vraćanje korisnika
+                    var user = result.First();
+                    return Ok(user);
             }
             catch (Exception ex)
             {

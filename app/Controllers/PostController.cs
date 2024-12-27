@@ -19,44 +19,67 @@ namespace app.Controllers
         }
 
         // POST: /Post
-        [HttpPost]
+        [HttpPost("addPost")]
         public async Task<IActionResult> CreatePost([FromBody] Post post)
         {
             try
             {
-                // Ensure the post has an author
-                if (post.author == null)
+                // Validacija ulaznih podataka
+                if (post == null || post.author == null || string.IsNullOrEmpty(post.author))
                 {
-                    return BadRequest("Author information is required.");
+                    return BadRequest(new { error = "Invalid post or author data" });
                 }
 
-                var query = @"
-                    CREATE (p:Post {postId: $postId, imageURL: $imageURL, caption: $caption, createdAt: $createdAt, likeCount: $likeCount})
-                    WITH p
-                    MATCH (u:User {userId: $authorId})
-                    CREATE (u)-[:CREATED]->(p)";
+                // Generisanje ID-a ako nije prosleđen
+                if (string.IsNullOrEmpty(post.postId))
+                {
+                    post.postId = Guid.NewGuid().ToString();
+                }
 
+                post.postId = Guid.NewGuid().ToString();
+
+
+                // Cypher upit za kreiranje posta
+                var cypherQuery = @"
+            MATCH (u:User {userId: $userId})
+            CREATE (p:Post {postId: $postId, imageURL: $imageURL, caption: $caption, createdAt: $createdAt, likeCount: $likeCount})
+            CREATE (u)-[:CREATED]->(p)
+            RETURN p";
+
+                // Parametri za upit
                 var parameters = new
                 {
                     postId = post.postId,
                     imageURL = post.imageURL,
                     caption = post.caption,
-                    createdAt = post.createdAt.ToString(),
+                    createdAt = post.createdAt,
                     likeCount = post.likeCount,
-                    authorId = post.author.UserId
+                    userId = post.author // Koristi UserId iz klase User
                 };
 
-                await _graphClient.Cypher
+                // Izvršavanje upita
+                var result = await _graphClient.Cypher
+                    .Match("(u:User {userId: $userId})")
                     .WithParams(parameters)
-                    .ExecuteWithoutResultsAsync();
+                    .Create("(p:Post {postId: $postId, imageURL: $imageURL, caption: $caption, createdAt: $createdAt, likeCount: $likeCount})")
+                    .Create("(u)-[:CREATED]->(p)")
+                    .Return(p => p.As<Post>())
+                    .ResultsAsync;
 
-                return Ok(new { Message = "Post created successfully", Post = post });
+                if (result == null)
+                {
+                    return StatusCode(500, new { error = "Failed to create post. User might not exist." });
+                }
+
+                // Vraćanje uspešnog odgovora
+                return Ok(new { message = "Post created successfully", post });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Error = ex.Message });
+                return StatusCode(500, new { error = ex.Message });
             }
         }
+
 
         // GET: /Post/{id}
         [HttpGet("{id}")]
@@ -83,7 +106,7 @@ namespace app.Controllers
                     return NotFound(new { Message = "Post not found" });
                 }
 
-                post.Post.author = post.Author;
+              //  post.Post.author = post.Author;
 
                 return Ok(post.Post);
             }
@@ -115,7 +138,7 @@ namespace app.Controllers
 
                 foreach (var result in results)
                 {
-                    result.Post.author = result.Author;
+                  //  result.Post.author = result.Author;
                     posts.Add(result.Post);
                 }
 
