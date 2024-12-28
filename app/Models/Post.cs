@@ -7,13 +7,13 @@ namespace app.Models
 {
     public class Post
     {
-        public String postId { get; set; }
-        public String imageURL { get; set; }
-        public String caption { get; set; }
+        public String?  postId { get; set; }
+        public String? imageURL { get; set; }
+        public String? caption { get; set; }
 
         
         public DateTime createdAt { get; set; }
-        public String author { get; set; }
+        public String? author { get; set; }
         public List<User> likes { get; set; }=new List<User>();
         public int likeCount { get; set; }
 

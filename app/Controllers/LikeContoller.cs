@@ -30,9 +30,9 @@ namespace app.Controllers
                 }
 
                 // Create a 'LIKES' relationship between the user and post
-                var query = @"
-                    MATCH (u:User {userId: $userId}), (p:Post {postId: $postId})
-                    CREATE (u)-[:LIKES]->(p)";
+                //var query = @"
+                //    MATCH (u:User {userId: $userId}), (p:Post {postId: $postId})
+                //    CREATE (u)-[:LIKES]->(p)";
 
                 var parameters = new
                 {
@@ -40,10 +40,13 @@ namespace app.Controllers
                     postId = like.post.postId
                 };
 
+                // Execute the query without expecting results (no assignment needed)
                 await _graphClient.Cypher
-                    .WithParams(parameters)
-                    .Match(query)
-                    .ExecuteWithoutResultsAsync();
+                                         .Match("(u:User {userId: $userId})", "(p:Post {postId: $postId})")
+                                         .WithParams(new { userId = like.user.UserId, postId = like.post.postId })
+                                         .Create("(u)-[:LIKES]->(p)")
+                                         .ExecuteWithoutResultsAsync();
+
 
                 return Ok(new { Message = "Post liked successfully" });
             }
@@ -53,6 +56,7 @@ namespace app.Controllers
             }
         }
 
+        // DELETE: /like
         // DELETE: /like
         [HttpDelete]
         public async Task<IActionResult> UnlikePost([FromBody] Like like)
@@ -66,19 +70,10 @@ namespace app.Controllers
                 }
 
                 // Remove the 'LIKES' relationship between the user and post
-                var query = @"
-                    MATCH (u:User {userId: $userId})-[r:LIKES]->(p:Post {postId: $postId})
-                    DELETE r";
-
-                var parameters = new
-                {
-                    userId = like.user.UserId,
-                    postId = like.post.postId
-                };
-
                 await _graphClient.Cypher
-                    .WithParams(parameters)
-                    .Match(query)
+                    .Match("(u:User {userId: $userId})-[r:LIKES]->(p:Post {postId: $postId})")
+                    .WithParams(new { userId = like.user.UserId, postId = like.post.postId })
+                    .Delete("r")  // Delete the relationship
                     .ExecuteWithoutResultsAsync();
 
                 return Ok(new { Message = "Post unliked successfully" });
@@ -88,5 +83,6 @@ namespace app.Controllers
                 return StatusCode(500, new { Error = ex.Message });
             }
         }
+
     }
 }
