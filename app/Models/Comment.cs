@@ -1,28 +1,24 @@
-﻿using Neo4j.Driver;
+﻿using app.Models;
+using System;
 
-namespace app.Models
-{ 
+public class Comment
+{
+    public string CommentId { get; set; }
+    public string Content { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public User Author { get; set; }
+    public Post Post { get; set; }
 
-    public class Comment
+    // Podrazumevani konstruktor (neophodan za deserializaciju)
+    public Comment() { }
+
+    // Konstruktor sa parametrima (ako je potrebno)
+    public Comment(string commentId, string content, DateTime createdAt, User author, Post post)
     {
-        public String commentId { get; set; }
-        public String content { get; set; }
-        public LocalDateTime createdAt { get; set; }
-        public User author { get; set; }
-        public Post post { get; set; }
-
-
-        public Comment(String commentId, String content, LocalDateTime createdAt, User author, Post post)
-        {
-            this.commentId = commentId;
-            this.content = content;
-            this.createdAt = createdAt;
-            this.author = author;
-            this.post = post;
-        }
-
-        
-
+        CommentId = commentId;
+        Content = content;
+        CreatedAt = createdAt;
+        Author = author;
+        Post = post;
     }
-
 }

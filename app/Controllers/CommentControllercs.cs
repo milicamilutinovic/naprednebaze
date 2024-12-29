@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using app.Models;
+using Neo4j.Driver;
+using System.Runtime.InteropServices;
 
 namespace app.Controllers
 {
@@ -25,29 +27,28 @@ namespace app.Controllers
         {
             try
             {
-                if (comment.author == null || comment.post == null)
+                if (comment.Author == null || comment.Post == null)
                 {
                     return BadRequest("Author and Post information are required.");
                 }
 
-                var query = @"
-                    MATCH (u:User {userId: $authorId}), (p:Post {postId: $postId})
-                    CREATE (c:Comment {commentId: $commentId, content: $content, createdAt: $createdAt})
-                    CREATE (u)-[:AUTHORED]->(c)
-                    CREATE (c)-[:BELONGS_TO]->(p)";
 
-                var parameters = new
-                {
-                    commentId = comment.commentId,
-                    content = comment.content,
-                    createdAt = comment.createdAt.ToString(),
-                    authorId = comment.author.UserId,
-                    postId = comment.post.postId
-                };
 
                 await _graphClient.Cypher
-                    .WithParams(parameters)
-                    .ExecuteWithoutResultsAsync();
+                                 .Match("(u:User {userId: $authorId})", "(p:Post {postId: $postId})")
+                                 .WithParams(new
+                                 {
+                                     commentId = comment.CommentId,
+                                     content = comment.Content,
+                                     authorId = comment.Author.UserId,
+                                     postId = comment.Post.postId,
+                                     createdAt = comment.CreatedAt
+                                 })
+                                 .Create("(c:Comment {commentId: $commentId, content: $content, createdAt: $createdAt})") // promenjeno
+                                 .Create("(u)-[:AUTHORED]->(c)")
+                                 .Create("(c)-[:BELONGS_TO]->(p)")
+                                 .ExecuteWithoutResultsAsync();
+
 
                 return Ok(new { Message = "Comment created successfully", Comment = comment });
             }
@@ -57,36 +58,43 @@ namespace app.Controllers
             }
         }
 
-        // GET: /Comment/{id}
+        //da se proveri ova get metoda, varaca mi 404, a u bazi posotij taj podatak
+        //NE ZNAM STO NECE!!!!!!!!!!!!!!!!!!!!
         [HttpGet("{id}")]
         public async Task<IActionResult> GetCommentById(string id)
         {
             try
             {
-                var query = @"
-                    MATCH (c:Comment {commentId: $commentId})-[:BELONGS_TO]->(p:Post), (u:User)-[:AUTHORED]->(c)
-                    RETURN c, p, u";
+                // Logovanje vrednosti id
+                Console.WriteLine($"Looking for Comment with ID: {id}");
 
-                var result = await _graphClient.Cypher
+                var query = await _graphClient.Cypher
+                    // Match Comment sa njegovim vezama ka User i Post
+                    .Match("(c:Comment {commentId: $commentId})-[:AUTHORED]->(u:User), (c)-[:BELONGS_TO]->(p:Post)")
                     .WithParam("commentId", id)
-                    .Return((c, p, u) => new
+                    // Vraćanje podataka o Comment-u, Author-u i Post-u
+                    .Return((c, u, p) => new
                     {
                         Comment = c.As<Comment>(),
-                        Post = p.As<Post>(),
-                        Author = u.As<User>()
+                        Author = u.As<User>(),
+                        Post = p.As<Post>()
                     })
                     .ResultsAsync;
 
-                var comment = result.FirstOrDefault();
-                if (comment == null)
+                var result = query.FirstOrDefault();
+
+                if (result == null)
                 {
                     return NotFound(new { Message = "Comment not found" });
                 }
 
-                comment.Comment.author = comment.Author;
-                comment.Comment.post = comment.Post;
+                var commentData = result;
 
-                return Ok(comment.Comment);
+                var comment = commentData.Comment;
+                comment.Author = commentData.Author;
+                comment.Post = commentData.Post;
+
+                return Ok(comment);
             }
             catch (Exception ex)
             {
@@ -94,68 +102,41 @@ namespace app.Controllers
             }
         }
 
-        // GET: /Comment/Post/{postId}
-        [HttpGet("Post/{postId}")]
-        public async Task<IActionResult> GetCommentsByPostId(string postId)
-        {
-            try
-            {
-                var query = @"
-                    MATCH (c:Comment)-[:BELONGS_TO]->(p:Post {postId: $postId}), (u:User)-[:AUTHORED]->(c)
-                    RETURN c, u";
 
-                var results = await _graphClient.Cypher
-                    .WithParam("postId", postId)
-                    .Return((c, u) => new
-                    {
-                        Comment = c.As<Comment>(),
-                        Author = u.As<User>()
-                    })
-                    .ResultsAsync;
 
-                var comments = results.Select(r =>
-                {
-                    r.Comment.author = r.Author;
-                    return r.Comment;
-                }).ToList();
 
-                return Ok(comments);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { Error = ex.Message });
-            }
-        }
 
-        // PUT: /Comment/{id}
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateComment(string id, [FromBody] Comment updatedComment)
         {
+            if (string.IsNullOrEmpty(updatedComment.CommentId) || string.IsNullOrEmpty(updatedComment.Content))
+            {
+                return BadRequest("CommentId and Content are required.");
+            }
+
             try
             {
-                var query = @"
-                    MATCH (c:Comment {commentId: $commentId})
-                    SET c.content = $content
-                    RETURN c";
-
-                var parameters = new
-                {
-                    commentId = id,
-                    content = updatedComment.content
-                };
-
-                var result = await _graphClient.Cypher
-                    .WithParams(parameters)
+                // Proverite da li je CommentId ispravan
+                var query = await _graphClient.Cypher
+                    .Match("(c:Comment {commentId: $commentId})")
+                    .WithParam("commentId", id)
+                    .Set("c.content = $content, c.createdAt = $createdAt")
+                    .WithParams(new
+                    {
+                        content = updatedComment.Content,
+                        createdAt = updatedComment.CreatedAt
+                    })
                     .Return(c => c.As<Comment>())
                     .ResultsAsync;
 
-                var comment = result.FirstOrDefault();
-                if (comment == null)
+                var result = query.FirstOrDefault();
+
+                if (result == null)
                 {
                     return NotFound(new { Message = "Comment not found" });
                 }
 
-                return Ok(new { Message = "Comment updated successfully", Comment = comment });
+                return Ok(new { Message = "Comment updated successfully", UpdatedComment = result });
             }
             catch (Exception ex)
             {
@@ -163,26 +144,29 @@ namespace app.Controllers
             }
         }
 
-        // DELETE: /Comment/{id}
+
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteComment(string id)
         {
             try
             {
-                var query = @"
-                    MATCH (c:Comment {commentId: $commentId})
-                    DETACH DELETE c";
-
+                // Cypher query to delete the comment
                 await _graphClient.Cypher
+                    .Match("(c:Comment {commentId: $commentId})")
                     .WithParam("commentId", id)
+                    .DetachDelete("c")
                     .ExecuteWithoutResultsAsync();
 
+                // Return success message
                 return Ok(new { Message = "Comment deleted successfully" });
             }
             catch (Exception ex)
             {
+                // Handle errors
                 return StatusCode(500, new { Error = ex.Message });
             }
         }
+
     }
 }
