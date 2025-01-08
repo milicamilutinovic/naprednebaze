@@ -114,7 +114,6 @@ namespace app.Controllers
         }
 
 
-        // GET: /Post
         [HttpGet]
         public async Task<IActionResult> GetPosts([FromQuery] string userId)
         {
