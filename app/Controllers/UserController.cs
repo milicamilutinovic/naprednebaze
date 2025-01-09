@@ -193,5 +193,49 @@ namespace app.Controllers
                 return StatusCode(500, new { Error = ex.Message });
             }
         }
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] User user)
+        {
+            var query = _graphClient.Cypher
+                .Match("(u:User {email: $Email, passwordHash: $PasswordHash})")
+                .WithParam("Email", user.Email)
+                .WithParam("PasswordHash", user.PasswordHash)
+                .Return(u => u.As<User>())
+                .ResultsAsync;
+
+            var result = await query;
+
+            if (!result.Any())
+            {
+                return Unauthorized("Invalid email or password.");
+            }
+
+            return Ok(result.First());
+        }
+
+        [HttpPost("register")]
+        public async Task<IActionResult> Register([FromBody] User user)
+        {
+            var query = _graphClient.Cypher
+                .Create("(u:User {email: $Email, passwordHash: $PasswordHash, fullName: $FullName, profilePicture: $ProfilePicture, bio: $Bio})")
+                .WithParam("Email", user.Email)
+                .WithParam("PasswordHash", user.PasswordHash)
+                .WithParam("FullName", user.FullName)
+                .WithParam("ProfilePicture", user.ProfilePicture)
+                .WithParam("Bio", user.Bio)
+                .Return(u => u.As<User>())
+                .ResultsAsync;
+
+            var result = await query;
+
+            if (!result.Any())
+            {
+                return StatusCode(500, "Error while registering.");
+            }
+
+            return CreatedAtAction(nameof(Register), new { id = user.UserId }, user);
+        }
+
+
     }
- }
+}

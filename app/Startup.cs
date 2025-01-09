@@ -27,21 +27,35 @@ namespace app
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddControllersWithViews();  // Use AddControllersWithViews for MVC with Razor views
+            services.AddRazorPages(); // If you're using Razor Pages
 
-            services.AddControllers();
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "app", Version = "v1" });
             });
 
-            var client = new GraphClient(new Uri("http://localhost:7474/db/data"), "neo4j", "password");
-            client.ConnectAsync().Wait(); // Use Wait() to make sure the connection is established synchronously for now
+            var client = InitializeNeo4jClient().Result;
             services.AddSingleton<IGraphClient>(client);
+            //autentifikacija
+            services.AddAuthentication("Cookies")
+                                .AddCookie(options =>
+                                {
+                                    options.LoginPath = "/Account/Login";   // Stranica za prijavu
+                                    options.LogoutPath = "/Account/Logout"; // Stranica za odjavu
+                                    options.AccessDeniedPath = "/Account/AccessDenied"; // Opcionalno, za pristup zabranjen
+                                });
 
-            //var client = new BoltGraphClient(new Uri("bolt://localhost:7687"), "neo4j", "password");
-            //client.ConnectAsync();
-            //services.AddSingleton<IGraphClient>(client);
         }
+
+
+        private async Task<IGraphClient> InitializeNeo4jClient()
+        {
+            var client = new GraphClient(new Uri("http://localhost:7474/db/data"), "neo4j", "password");
+            await client.ConnectAsync();  // Use async here for non-blocking connection
+            return client;
+        }
+
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -54,15 +68,19 @@ namespace app
             }
 
             app.UseHttpsRedirection();
-
             app.UseRouting();
+            app.UseCors();  // Make sure CORS is applied
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>
             {
-                endpoints.MapControllers();
+                endpoints.MapControllerRoute(
+                    name: "default",
+                    pattern: "{controller=Home}/{action=Index}/{id?}");
             });
         }
+
     }
 }
