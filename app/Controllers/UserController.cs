@@ -216,26 +216,48 @@ namespace app.Controllers
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] User user)
         {
-            var query = _graphClient.Cypher
-                .Create("(u:User {email: $Email, passwordHash: $PasswordHash, fullName: $FullName, profilePicture: $ProfilePicture, bio: $Bio})")
-                .WithParam("Email", user.Email)
-                .WithParam("PasswordHash", user.PasswordHash)
-                .WithParam("FullName", user.FullName)
-                .WithParam("ProfilePicture", user.ProfilePicture)
-                .WithParam("Bio", user.Bio)
-                .Return(u => u.As<User>())
-                .ResultsAsync;
-
-            var result = await query;
-
-            if (!result.Any())
+            if (user == null)
             {
-                return StatusCode(500, "Error while registering.");
+                return BadRequest("User data is required.");
             }
 
-            return CreatedAtAction(nameof(Register), new { id = user.UserId }, user);
-        }
+            // Validacija unosa korisnika
+            if (string.IsNullOrEmpty(user.Username) || string.IsNullOrEmpty(user.Email) || string.IsNullOrEmpty(user.PasswordHash))
+            {
+                return BadRequest("Username, Email, and Password are required.");
+            }
 
+            try
+            {
+                // Automatski postavi vrednosti za UserId, CreatedAt, i IsAdmin
+                user.UserId = Guid.NewGuid().ToString();
+                user.CreatedAt = DateTime.UtcNow; // Trenutno vreme u UTC formatu
+                user.IsAdmin = false;            // Admin je podrazumevano false
+
+                // Kreiraj novog korisnika u bazi
+                var query = _graphClient.Cypher
+                    .Create("(u:User {userId: $UserId, username: $Username, fullName: $FullName, email: $Email, passwordHash: $PasswordHash, profilePicture: $ProfilePicture, bio: $Bio, createdAt: $CreatedAt, isAdmin: $IsAdmin})")
+                    .WithParam("UserId", user.UserId)
+                    .WithParam("Username", user.Username)
+                    .WithParam("FullName", user.FullName ?? string.Empty) // Prazan string ako FullName nije prosleđen
+                    .WithParam("Email", user.Email)
+                    .WithParam("PasswordHash", user.PasswordHash)
+                    .WithParam("ProfilePicture", user.ProfilePicture ?? "default.png") // Podrazumevana slika
+                    .WithParam("Bio", user.Bio ?? "New user")
+                    .WithParam("CreatedAt", user.CreatedAt)
+                    .WithParam("IsAdmin", user.IsAdmin);
+
+                await query.ExecuteWithoutResultsAsync();
+
+                // Uspešna registracija
+                return CreatedAtAction(nameof(Register), new { id = user.UserId }, user);
+            }
+            catch (Exception ex)
+            {
+                // Obrada grešaka
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
 
     }
 }

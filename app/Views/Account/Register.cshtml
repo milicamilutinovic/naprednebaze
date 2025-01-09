@@ -1,23 +1,32 @@
-﻿@model app.Models.User
+﻿@{
+    ViewData["Title"] = "Register";
+}
 
-<h2 class="text-center my-4">Register</h2>
-
-<form method="post" asp-controller="Account" asp-action="Register" class="container">
+<form method="post" action="/Account/Register" class="container">
     <div class="mb-3">
-        <label for="Username" class="form-label">Username:</label>
-        <input type="text" id="Username" name="Username" class="form-control" required />
+        <label for="username" class="form-label">Username:</label>
+        <input type="text" id="username" name="username" class="form-control" required />
     </div>
     <div class="mb-3">
-        <label for="FullName" class="form-label">Full Name:</label>
-        <input type="text" id="FullName" name="FullName" class="form-control" />
+        <label for="fullName" class="form-label">Full Name:</label>
+        <input type="text" id="fullName" name="fullName" class="form-control" required />
     </div>
     <div class="mb-3">
-        <label for="Email" class="form-label">Email:</label>
-        <input type="email" id="Email" name="Email" class="form-control" required />
+        <label for="email" class="form-label">Email:</label>
+        <input type="email" id="email" name="email" class="form-control" required />
     </div>
     <div class="mb-3">
-        <label for="PasswordHash" class="form-label">Password:</label>
-        <input type="password" id="PasswordHash" name="PasswordHash" class="form-control" required />
+        <label for="password" class="form-label">Password:</label>
+        <input type="password" id="password" name="password" class="form-control" required />
+    </div>
+    <div class="mb-3">
+        <label for="profilePicture" class="form-label">Profile Picture URL:</label>
+        <input type="url" id="profilePicture" name="profilePicture" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label for="bio" class="form-label">Bio:</label>
+        <textarea id="bio" name="bio" class="form-control" rows="3"></textarea>
     </div>
     <button type="submit" class="btn btn-primary w-100">Register</button>
 </form>
+

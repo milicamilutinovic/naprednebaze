@@ -76,49 +76,68 @@ public class AccountController : Controller
         }
 
     [HttpPost]
-    public async Task<IActionResult> Register([FromBody] User user)
+    public async Task<IActionResult> Register(string username, string fullName, string password, string email, string profilePicture, string bio)
     {
-        if (user == null)
+        // Provera da li korisničko ime već postoji
+        var existingUser = await _graphClient.Cypher
+            .Match("(u:User {username: $Username})")
+            .WithParam("Username", username)
+            .Return<int>("count(u)")
+            .ResultsAsync;
+
+        if (existingUser.Single() > 0)
         {
-            return BadRequest("User data is required.");
+            ViewBag.Error = "Username already exists.";
+            return View();
         }
 
-        // Validacija unosa korisnika
-        if (string.IsNullOrEmpty(user.Username) || string.IsNullOrEmpty(user.Email) || string.IsNullOrEmpty(user.PasswordHash))
+        // Provera da li email već postoji
+        var existingEmail = await _graphClient.Cypher
+            .Match("(u:User {email: $Email})")
+            .WithParam("Email", email)
+            .Return<int>("count(u)")
+            .ResultsAsync;
+
+        if (existingEmail.Single() > 0)
         {
-            return BadRequest("Username, Email, and Password are required.");
+            ViewBag.Error = "Email already registered.";
+            return View();
         }
 
-        try
+        
+
+        // Kreiranje novog korisnika
+        var user = new User
         {
-            // Automatski postavi vrednosti za UserId, CreatedAt, i IsAdmin
-            user.UserId = Guid.NewGuid().ToString();
-            user.CreatedAt = DateTime.UtcNow; // Trenutno vreme u UTC formatu
-            user.IsAdmin = false;            // Admin je podrazumevano false
+            UserId = Guid.NewGuid().ToString(),
+            Username = username,
+            FullName = fullName,
+            Email = email,
+            PasswordHash = password,
+            ProfilePicture = profilePicture,
+            Bio = bio,
+            CreatedAt = DateTime.UtcNow,
+            IsAdmin = false
+        };
 
-            // Kreiraj novog korisnika u bazi
-            var query = _graphClient.Cypher
-                .Create("(u:User {userId: $UserId, username: $Username, fullName: $FullName, email: $Email, passwordHash: $PasswordHash, profilePicture: $ProfilePicture, bio: $Bio, createdAt: $CreatedAt, isAdmin: $IsAdmin})")
-                .WithParam("UserId", user.UserId)
-                .WithParam("Username", user.Username)
-                .WithParam("FullName", user.FullName ?? string.Empty) // Prazan string ako FullName nije prosleđen
-                .WithParam("Email", user.Email)
-                .WithParam("PasswordHash", user.PasswordHash)
-                .WithParam("ProfilePicture", user.ProfilePicture ?? "default.png") // Podrazumevana slika
-                .WithParam("Bio", user.Bio ?? "New user")
-                .WithParam("CreatedAt", user.CreatedAt)
-                .WithParam("IsAdmin", user.IsAdmin);
+        // Čuvanje korisnika u Neo4j bazi
+        await _graphClient.Cypher
+            .Create("(u:User {userId: $UserId, username: $Username, fullName: $FullName, email: $Email, passwordHash: $PasswordHash, profilePicture: $ProfilePicture, bio: $Bio, createdAt: $CreatedAt, isAdmin: $IsAdmin})")
+            .WithParams(new
+            {
+                UserId = user.UserId,
+                Username = user.Username,
+                FullName = user.FullName,
+                Email = user.Email,
+                PasswordHash = user.PasswordHash,
+                ProfilePicture = user.ProfilePicture,
+                Bio = user.Bio,
+                CreatedAt = user.CreatedAt,
+                IsAdmin = user.IsAdmin
+            })
+            .ExecuteWithoutResultsAsync();
 
-            await query.ExecuteWithoutResultsAsync();
-
-            // Uspešna registracija
-            return CreatedAtAction(nameof(Register), new { id = user.UserId }, user);
-        }
-        catch (Exception ex)
-        {
-            // Obrada grešaka
-            return StatusCode(500, $"Internal server error: {ex.Message}");
-        }
+        return RedirectToAction("Login"); // Preusmeravanje na stranicu za prijavu
     }
 
 }
