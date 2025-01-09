@@ -193,25 +193,25 @@ namespace app.Controllers
                 return StatusCode(500, new { Error = ex.Message });
             }
         }
-        [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] User user)
-        {
-            var query = _graphClient.Cypher
-                .Match("(u:User {email: $Email, passwordHash: $PasswordHash})")
-                .WithParam("Email", user.Email)
-                .WithParam("PasswordHash", user.PasswordHash)
-                .Return(u => u.As<User>())
-                .ResultsAsync;
+        //[HttpPost("login")]
+        //public async Task<IActionResult> Login([FromBody] User user)
+        //{
+        //    var query = _graphClient.Cypher
+        //        .Match("(u:User {email: $Email, passwordHash: $PasswordHash})")
+        //        .WithParam("Email", user.Email)
+        //        .WithParam("PasswordHash", user.PasswordHash)
+        //        .Return(u => u.As<User>())
+        //        .ResultsAsync;
 
-            var result = await query;
+        //    var result = await query;
 
-            if (!result.Any())
-            {
-                return Unauthorized("Invalid email or password.");
-            }
+        //    if (!result.Any())
+        //    {
+        //        return Unauthorized("Invalid email or password.");
+        //    }
 
-            return Ok(result.First());
-        }
+        //    return Ok(result.First());
+        //}
 
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] User user)

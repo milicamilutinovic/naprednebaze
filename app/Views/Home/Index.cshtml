@@ -1,8 +1,20 @@
 ﻿@{
     ViewData["Title"] = "Home";
+
+    // Provera da li je korisnik ulogovan
+    var userName = User.Identity.IsAuthenticated ? User.Identity.Name : null;
 }
 
-<h1 class="text-center my-5">Welcome to My Application</h1>
+<h1 class="text-center my-5">
+    @if (!string.IsNullOrEmpty(userName))
+    {
+        @($"Welcome, {userName}!")
+    }
+    else
+    {
+        @("Welcome to My Application")
+    }
+</h1>
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
@@ -12,17 +24,23 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <a class="nav-link text-white" href="/Account/Login">Login</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link text-white" href="/Account/Register">Register</a>
-                </li>
-                <li class="nav-item">
-                    <form method="post" action="/Account/Logout" class="d-inline">
-                        <button type="submit" class="btn btn-danger">Logout</button>
-                    </form>
-                </li>
+                @if (User.Identity.IsAuthenticated)
+                {
+                    <li class="nav-item">
+                        <form method="post" action="/Account/Logout" class="d-inline">
+                            <button type="submit" class="btn btn-danger">Logout</button>
+                        </form>
+                    </li>
+                }
+                else
+                {
+                    <li class="nav-item">
+                        <a class="nav-link text-white" href="/Account/Login">Login</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white" href="/Account/Register">Register</a>
+                    </li>
+                }
             </ul>
         </div>
     </div>
