@@ -26,6 +26,12 @@
             <ul class="navbar-nav ms-auto">
                 @if (User.Identity.IsAuthenticated)
                 {
+                    <!-- Dugme za UserPage -->
+                    <li class="nav-item">
+                        <a class="btn btn-primary" href="/User/UserPage" role="button">Go to User Page</a>
+                    </li>
+
+                    <!-- Dugme za Logout -->
                     <li class="nav-item">
                         <form method="post" action="/Account/Logout" class="d-inline">
                             <button type="submit" class="btn btn-danger">Logout</button>

@@ -10,7 +10,7 @@ namespace app.Controllers
 {
     [ApiController]
     [Route("[controller]")]
-    public class UserController : ControllerBase
+    public class UserController : Controller
     {
         private readonly IGraphClient _graphClient;
 
@@ -105,6 +105,52 @@ namespace app.Controllers
                 return StatusCode(500, new { Error = ex.Message });
             }
         }
+        [HttpGet("/User/UserPage")]
+        public async Task<IActionResult> UserPage()
+        {
+            try
+            {
+                // Dohvatanje korisničkog imena iz trenutne sesije (kako bi se prikazali podaci tog korisnika)
+                var username = User.Identity.Name; // Pretpostavljamo da je username sačuvan u identitetu korisnika
+
+                if (string.IsNullOrEmpty(username))
+                {
+                    return RedirectToAction("Login", "Account");
+                }
+
+                // Upit za pretragu korisnika na osnovu username-a
+                var query = _graphClient.Cypher
+                    .Match("(u:User {username: $username})")  // Tražimo korisnika sa određenim username
+                    .WithParam("username", username)  // Prosleđujemo parametar sa username
+                    .Return(u => u.As<User>())  // Vraćamo korisničke podatke
+                    .ResultsAsync;
+
+                // Izvršavamo upit
+                var result = await query;
+                if (!result.Any()) // Ako nema rezultata, ispisujemo grešku
+                {
+                    return NotFound("No user found with the given username.");
+                }
+                    var user = result.FirstOrDefault();
+
+                // Ako korisnik nije pronađen, vraćamo NotFound
+                if (user == null)
+                {
+                    return NotFound("User not found");
+                }
+                
+                // Vraćamo korisničke podatke na view
+                return View(user);
+            }
+            catch (Exception ex)
+            {
+                // U slučaju greške, vraćamo grešku
+                return StatusCode(500, new { Error = ex.Message });
+            }
+        }
+
+        
+
 
         // DELETE: api/User/{id}
         [HttpDelete("{id}")]

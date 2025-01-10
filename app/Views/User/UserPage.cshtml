@@ -1,0 +1,63 @@
+﻿@model app.Models.User
+
+@{
+    ViewData["Title"] = "User Profile";
+}
+
+<h2 class="text-center my-4">User Profile</h2>
+
+<div class="container">
+    <div class="mb-3">
+        <label class="form-label">Username:</label>
+        <p class="form-control-plaintext">@Model.Username</p>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Full Name:</label>
+        <p class="form-control-plaintext">@Model.FullName</p>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Bio:</label>
+        <p class="form-control-plaintext">@Model.Bio</p>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Profile Picture:</label>
+        @if (string.IsNullOrEmpty(Model.ProfilePicture))
+        {
+            <p class="form-control-plaintext">No profile picture available.</p>
+        }
+        else
+        {
+            <img src="@Url.Content(Model.ProfilePicture)" alt="Profile Picture" style="width: 150px; height: 150px;" class="rounded-circle border" />
+        }
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Friends:</label>
+        <ul class="list-group">
+            @foreach (var friend in Model.prijatelji ?? new List<User>())
+            {
+                <li class="list-group-item">
+                    @friend.FullName
+                </li>
+            }
+        </ul>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Posts:</label>
+        <ul class="list-group">
+            @foreach (var post in Model.postovi ?? new List<Post>())
+            {
+                <li class="list-group-item">
+                    @post.caption
+                </li>
+            }
+        </ul>
+    </div>
+    <div class="mt-4 text-center">
+        <form method="post" action="/Account/Logout">
+            <button type="submit" class="btn btn-danger">Logout</button>
+        </form>
+    </div>
+   
+</div>

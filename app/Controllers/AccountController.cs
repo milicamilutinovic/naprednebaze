@@ -104,7 +104,8 @@ public class AccountController : Controller
             return View();
         }
 
-        
+       
+
 
         // Kreiranje novog korisnika
         var user = new User
