@@ -54,10 +54,43 @@
             }
         </ul>
     </div>
+
+    <!-- Add Post Button -->
+    <div class="text-center mt-3">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPostModal">Add Post</button>
+    </div>
+
+    <!-- Modal for adding post -->
+    <div class="modal fade" id="addPostModal" tabindex="-1" aria-labelledby="addPostModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addPostModalLabel">Create New Post</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post" action="/Post/CreatePost" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Upload Image</label>
+                            <input type="file" class="form-control" name="image" accept="image/*" required />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Caption</label>
+                            <input type="text" class="form-control" name="caption" required />
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Post</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <div class="mt-4 text-center">
         <form method="post" action="/Account/Logout">
             <button type="submit" class="btn btn-danger">Logout</button>
         </form>
     </div>
-   
 </div>

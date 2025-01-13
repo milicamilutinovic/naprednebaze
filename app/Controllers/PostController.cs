@@ -9,10 +9,10 @@ namespace app.Controllers
 {
     [ApiController]
     [Route("[controller]")]
-    public class PostController : ControllerBase
+    public class PostController : Controller
     {
         private readonly IGraphClient _graphClient;
-
+        
         public PostController(IGraphClient graphClient)
         {
             _graphClient = graphClient;
@@ -20,7 +20,7 @@ namespace app.Controllers
 
         // POST: /Post
         [HttpPost("addPost")]
-        public async Task<IActionResult> CreatePost([FromBody] Post post)
+        public async Task<IActionResult> CreatePost1([FromBody] Post post)
         {
             try
             {
@@ -39,12 +39,13 @@ namespace app.Controllers
                 post.postId = Guid.NewGuid().ToString();
 
 
-                // Cypher upit za kreiranje posta
                 var cypherQuery = @"
-            MATCH (u:User {userId: $userId})
-            CREATE (p:Post {postId: $postId, imageURL: $imageURL, caption: $caption, createdAt: $createdAt, likeCount: $likeCount})
-            CREATE (u)-[:CREATED]->(p)
-            RETURN p";
+MATCH (u:User {userId: $userId})
+CREATE (p:Post {postId: $postId, imageURL: $imageURL, caption: $caption, createdAt: $createdAt, likeCount: $likeCount})
+CREATE (u)-[:CREATED]->(p)
+CREATE (u)-[:AUTHORED_BY]->(p)  // Dodajte vezu između autora i posta
+RETURN p";
+
 
                 // Parametri za upit
                 var parameters = new
@@ -79,7 +80,78 @@ namespace app.Controllers
                 return StatusCode(500, new { error = ex.Message });
             }
         }
+        [HttpPost("CreatePost")]
+        public async Task<IActionResult> CreatePost([FromForm] IFormFile image, [FromForm] string caption)
+        {
+            try
+            {
+                // Validacija podataka
+                if (image == null || string.IsNullOrEmpty(caption))
+                {
+                    return BadRequest(new { error = "Image and caption are required." });
+                }
 
+                // var userId = "c01db770-0cc9-43e4-b317-5c10f0866164"; // Fetch the currently logged-in user
+                var userIdClaim = HttpContext.User.Claims.FirstOrDefault(c => c.Type == "UserId");
+                if (userIdClaim == null)
+                {
+                    return Unauthorized(new { error = "User is not logged in." });
+                }
+
+                var userId = userIdClaim.Value;
+                var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/images", image.FileName);
+
+                // Save the image to the server
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await image.CopyToAsync(stream);
+                }
+
+                // Kreiranje posta
+                var post = new Post
+                {
+                    postId = Guid.NewGuid().ToString(),
+                    imageURL = "/images/" + image.FileName,
+                    caption = caption,
+                    createdAt = DateTime.Now,
+                    author = userId,  // Assuming user.Username exists
+                    likeCount = 0
+                };
+
+                // Spajanje sa Neo4j bazom
+                var cypherQuery = @"
+MATCH (u:User {userId: $userId})
+CREATE (p:Post {postId: $postId, imageURL: $imageURL, caption: $caption, createdAt: $createdAt, likeCount: $likeCount,author: $author})
+CREATE (u)-[:CREATED]->(p)
+RETURN p";
+
+                var parameters = new
+                {
+                    postId = post.postId,
+                    imageURL = post.imageURL,
+                    caption = post.caption,
+                    createdAt = post.createdAt,
+                    likeCount = post.likeCount,
+                    author=post.author, // Assuming user.UserId exists
+                    userId = userId
+                };
+
+                // Izvršavanje upita
+                var result = await _graphClient.Cypher
+           .WithParams(parameters)
+           .Match("(u:User {userId: $userId})")
+           .Create("(p:Post {postId: $postId, imageURL: $imageURL, caption: $caption, createdAt: $createdAt, likeCount: $likeCount, author: $author})")
+           .Create("(u)-[:CREATED]->(p)")
+           .Return(p => p.As<Post>())
+           .ResultsAsync;
+
+                return Ok(new { message = "Post created successfully", post });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
 
 
         // GET: /Post/{id}
@@ -88,24 +160,22 @@ namespace app.Controllers
         {
             try
             {
-                // Upit za pronalaženje posta na osnovu postId
                 var query = _graphClient.Cypher
-                    .Match("(p:Post)")
-                    .Where((Post p) => p.postId == postId)
-                    .Return(p => p.As<Post>());
+    .Match("(p:Post)<-[:CREATED]-(u:User)")  // Povezivanje sa korisnikom
+    .Where((Post p) => p.postId == postId)
+    .Return((p, u) => new { Post = p.As<Post>(), Author = u.As<User>() }); // Vraćanje posta i autora
 
-                // Izvršavanje upita i dobijanje rezultata
-                var posts = await query.ResultsAsync;
+                var result = await query.ResultsAsync;
 
-                // Proverite da li je post pronađen
-                var post = posts.FirstOrDefault(); // Uzima prvi post ili null ako nije pronađen
-
+                var post = result.FirstOrDefault();
                 if (post == null)
                 {
                     return NotFound($"Post with ID {postId} not found.");
                 }
 
-                return Ok(post); // Vraća post sa statusom 200 OK
+                // Vraćanje posta sa autorom
+                post.Post.author = post.Author?.UserId; // Dodajte author iz korisničkog nod-a ako je pronađen
+                return Ok(post.Post); // Vraća post sa autorom
             }
             catch (Exception ex)
             {

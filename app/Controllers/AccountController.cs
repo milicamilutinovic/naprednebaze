@@ -49,7 +49,9 @@ public class AccountController : Controller
         var claims = new List<Claim>
     {
         new Claim(ClaimTypes.Name, user.Username), // Claim za korisničko ime
-        new Claim(ClaimTypes.Email, user.Email)    // Claim za email
+        new Claim(ClaimTypes.Email, user.Email),   // Claim za email
+            new Claim("UserId", user.UserId) // Dodajemo UserId kao claim
+
     };
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -103,9 +105,7 @@ public class AccountController : Controller
             ViewBag.Error = "Email already registered.";
             return View();
         }
-
-       
-
+        
 
         // Kreiranje novog korisnika
         var user = new User

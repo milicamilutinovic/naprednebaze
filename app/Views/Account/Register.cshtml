@@ -2,7 +2,7 @@
     ViewData["Title"] = "Register";
 }
 
-<form method="post" action="/Account/Register" class="container">
+<form method="post" action="/Account/Register" enctype="multipart/form-data" class="container">
     <div class="mb-3">
         <label for="username" class="form-label">Username:</label>
         <input type="text" id="username" name="username" class="form-control" required />
@@ -20,8 +20,8 @@
         <input type="password" id="password" name="password" class="form-control" required />
     </div>
     <div class="mb-3">
-        <label for="profilePicture" class="form-label">Profile Picture URL:</label>
-        <input type="url" id="profilePicture" name="profilePicture" class="form-control" />
+        <label for="profilePicture" class="form-label">Profile Picture:</label>
+        <input type="file" id="profilePicture" name="profilePicture" class="form-control" />
     </div>
     <div class="mb-3">
         <label for="bio" class="form-label">Bio:</label>
