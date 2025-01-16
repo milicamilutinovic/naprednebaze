@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using app.Controllers;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
@@ -29,7 +30,8 @@ namespace app
         {
             services.AddControllersWithViews();  // Use AddControllersWithViews for MVC with Razor views
             services.AddRazorPages(); // If you're using Razor Pages
-
+            services.AddScoped<PostController, PostController>();
+            services.AddScoped<PostController>();
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "app", Version = "v1" });

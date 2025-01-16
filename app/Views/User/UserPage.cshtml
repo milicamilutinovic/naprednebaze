@@ -6,20 +6,24 @@
 
 <h2 class="text-center my-4">User Profile</h2>
 
-<div class="container">
-    <div class="mb-3">
+<div class="container profile-container">
+    <!-- User Details Section -->
+    <div class="profile-details mb-3">
         <label class="form-label">Username:</label>
         <p class="form-control-plaintext">@Model.Username</p>
     </div>
-    <div class="mb-3">
+
+    <div class="profile-details mb-3">
         <label class="form-label">Full Name:</label>
         <p class="form-control-plaintext">@Model.FullName</p>
     </div>
-    <div class="mb-3">
+
+    <div class="profile-details mb-3">
         <label class="form-label">Bio:</label>
         <p class="form-control-plaintext">@Model.Bio</p>
     </div>
-    <div class="mb-3">
+
+    <div class="profile-details mb-3">
         <label class="form-label">Profile Picture:</label>
         @if (string.IsNullOrEmpty(Model.ProfilePicture))
         {
@@ -27,11 +31,23 @@
         }
         else
         {
-            <img src="@Url.Content(Model.ProfilePicture)" alt="Profile Picture" style="width: 150px; height: 150px;" class="rounded-circle border" />
+            <img src="@Url.Content(Model.ProfilePicture)" alt="Profile Picture" class="rounded-circle border profile-img" />
         }
     </div>
 
-    <div class="mb-3">
+    <!-- Logout Button -->
+    <form method="post" action="@Url.Action("Logout", "Account")">
+        <button type="submit" class="btn btn-danger">Logout</button>
+    </form>
+
+    <!-- Add Friend Button -->
+    <button class="btn btn-primary mt-3" data-bs-toggle="modal" data-bs-target="#addFriendModal">Add Friend</button>
+
+    <!-- Add Post Button -->
+    <button class="btn btn-success mt-3" data-bs-toggle="modal" data-bs-target="#addPostModal">Add Post</button>
+
+    <!-- Friends List -->
+    <div class="friends-list mb-3">
         <label class="form-label">Friends:</label>
         <ul class="list-group">
             @foreach (var friend in Model.prijatelji ?? new List<User>())
@@ -43,21 +59,117 @@
         </ul>
     </div>
 
-    <div class="mb-3">
+    <!-- Posts List -->
+    <div class="posts-list mb-3">
         <label class="form-label">Posts:</label>
-        <ul class="list-group">
-            @foreach (var post in Model.postovi ?? new List<Post>())
-            {
-                <li class="list-group-item">
-                    @post.caption
-                </li>
-            }
+        <ul class="list-group" id="postList">
+            <!-- Posts will be dynamically loaded here -->
         </ul>
     </div>
-    <div class="mt-4 text-center">
-        <form method="post" action="/Account/Logout">
-            <button type="submit" class="btn btn-danger">Logout</button>
-        </form>
-    </div>
-   
 </div>
+
+<!-- Add Friend Modal -->
+<div class="modal fade" id="addFriendModal" tabindex="-1" aria-labelledby="addFriendModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addFriendModalLabel">Search Users</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="form-control" id="searchBar" placeholder="Search Users" />
+                <ul class="list-group" id="userList"></ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Post Modal -->
+<div class="modal fade" id="addPostModal" tabindex="-1" aria-labelledby="addPostModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addPostModalLabel">Add Post</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="@Url.Action("AddPost", "PostController")" enctype="multipart/form-data" id="addPostForm">
+                    <div class="mb-3">
+                        <label for="image" class="form-label">Choose Image</label>
+                        <input type="file" class="form-control" id="imageURL" name="imageURL" accept="image/*" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="caption" class="form-label">Post Caption</label>
+                        <textarea class="form-control" id="caption" name="caption" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success">Add Post</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const userId = '@Model.UserId'; // Ensure this is correctly populated
+
+        if (userId) {
+            fetch(`/PostController/GetPosts?userId=${userId}`)
+                .then(response => response.json())
+                .then(posts => {
+                    const postList = document.getElementById("postList");
+                    postList.innerHTML = ''; // Clear any existing content
+
+                    if (posts.length === 0) {
+                        postList.innerHTML = "<li class='list-group-item'>No posts available.</li>";
+                    }
+
+                    posts.forEach(post => {
+                        const listItem = document.createElement("li");
+                        listItem.classList.add("list-group-item");
+                        listItem.innerHTML = `
+                            <strong>${post.caption}</strong><br/>
+                            <img src="${post.imageURL}" alt="Post Image" class="img-thumbnail post-img" />
+                        `;
+                        postList.appendChild(listItem);
+                    });
+                })
+                .catch(error => {
+                    console.error("Error fetching posts:", error);
+                });
+        } else {
+            console.error("No userId found!");
+        }
+    });
+</script>
+
+<style>
+    .profile-container {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .profile-img {
+        width: 150px;
+        height: 150px;
+        object-fit: cover;
+    }
+
+    .profile-details {
+        overflow: hidden;
+    }
+
+    .posts-list, .friends-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .post-img {
+        width: 100px;
+        height: 100px;
+        object-fit: cover;
+    }
+</style>

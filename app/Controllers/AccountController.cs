@@ -1,4 +1,5 @@
-﻿using app.Models;
+﻿using app.Controllers;
+using app.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
@@ -8,10 +9,11 @@ using System.Security.Claims;
 public class AccountController : Controller
 {
     private readonly IGraphClient _graphClient; // Pretpostavljamo da koristite Neo4j ili drugi DB klijent
-
-    public AccountController(IGraphClient graphClient)
+    private readonly PostController _postController;
+    public AccountController(IGraphClient graphClient, PostController postController)
     {
         _graphClient = graphClient;
+        _postController = postController;
     }
 
     [HttpGet]
@@ -23,6 +25,8 @@ public class AccountController : Controller
     [HttpPost]
     public async Task<IActionResult> Login(string username, string password)
     {
+    
+
         // Traženje korisnika u bazi na osnovu korisničkog imena
         var user = (await _graphClient.Cypher
                  .Match("(u:User {username: $Username})")
@@ -49,7 +53,8 @@ public class AccountController : Controller
         var claims = new List<Claim>
     {
         new Claim(ClaimTypes.Name, user.Username), // Claim za korisničko ime
-        new Claim(ClaimTypes.Email, user.Email)    // Claim za email
+        new Claim(ClaimTypes.Email, user.Email)  ,  // Claim za email
+          new Claim(ClaimTypes.NameIdentifier, user.UserId)
     };
 
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -140,5 +145,6 @@ public class AccountController : Controller
 
         return RedirectToAction("Login"); // Preusmeravanje na stranicu za prijavu
     }
+ 
 
 }

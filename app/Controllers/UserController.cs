@@ -131,14 +131,14 @@ namespace app.Controllers
                 {
                     return NotFound("No user found with the given username.");
                 }
-                    var user = result.FirstOrDefault();
+                var user = result.FirstOrDefault();
 
                 // Ako korisnik nije pronađen, vraćamo NotFound
                 if (user == null)
                 {
                     return NotFound("User not found");
                 }
-                
+
                 // Vraćamo korisničke podatke na view
                 return View(user);
             }
@@ -149,7 +149,7 @@ namespace app.Controllers
             }
         }
 
-        
+
 
 
         // DELETE: api/User/{id}
@@ -239,70 +239,36 @@ namespace app.Controllers
                 return StatusCode(500, new { Error = ex.Message });
             }
         }
-        //[HttpPost("login")]
-        //public async Task<IActionResult> Login([FromBody] User user)
-        //{
-        //    var query = _graphClient.Cypher
-        //        .Match("(u:User {email: $Email, passwordHash: $PasswordHash})")
-        //        .WithParam("Email", user.Email)
-        //        .WithParam("PasswordHash", user.PasswordHash)
-        //        .Return(u => u.As<User>())
-        //        .ResultsAsync;
 
-        //    var result = await query;
 
-        //    if (!result.Any())
-        //    {
-        //        return Unauthorized("Invalid email or password.");
-        //    }
-
-        //    return Ok(result.First());
-        //}
-
-        [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] User user)
+        // Action to handle adding a friend
+        [HttpPost]
+        public async Task<IActionResult> AddFriend(string username)
         {
-            if (user == null)
+            var currentUser = (await _graphClient.Cypher
+                .Match("(u:User {username: $Username})")
+                .WithParam("Username", User.Identity.Name)
+                .Return(u => u.As<User>())
+                .ResultsAsync)
+                .FirstOrDefault();
+
+            var friend = (await _graphClient.Cypher
+                .Match("(u:User {username: $Username})")
+                .WithParam("Username", username)
+                .Return(u => u.As<User>())
+                .ResultsAsync)
+                .FirstOrDefault();
+
+            if (friend != null && currentUser != null)
             {
-                return BadRequest("User data is required.");
+                // Create a relationship between currentUser and friend
+                await _graphClient.Cypher
+                    .Match("(u:User {userId: $CurrentUserId}), (f:User {userId: $FriendUserId})")
+                    .WithParams(new { CurrentUserId = currentUser.UserId, FriendUserId = friend.UserId })
+                    .Merge("(u)-[:FRIEND]->(f)") // Create FRIEND relationship
+                    .ExecuteWithoutResultsAsync();
             }
-
-            // Validacija unosa korisnika
-            if (string.IsNullOrEmpty(user.Username) || string.IsNullOrEmpty(user.Email) || string.IsNullOrEmpty(user.PasswordHash))
-            {
-                return BadRequest("Username, Email, and Password are required.");
-            }
-
-            try
-            {
-                // Automatski postavi vrednosti za UserId, CreatedAt, i IsAdmin
-                user.UserId = Guid.NewGuid().ToString();
-                user.CreatedAt = DateTime.UtcNow; // Trenutno vreme u UTC formatu
-                user.IsAdmin = false;            // Admin je podrazumevano false
-
-                // Kreiraj novog korisnika u bazi
-                var query = _graphClient.Cypher
-                    .Create("(u:User {userId: $UserId, username: $Username, fullName: $FullName, email: $Email, passwordHash: $PasswordHash, profilePicture: $ProfilePicture, bio: $Bio, createdAt: $CreatedAt, isAdmin: $IsAdmin})")
-                    .WithParam("UserId", user.UserId)
-                    .WithParam("Username", user.Username)
-                    .WithParam("FullName", user.FullName ?? string.Empty) // Prazan string ako FullName nije prosleđen
-                    .WithParam("Email", user.Email)
-                    .WithParam("PasswordHash", user.PasswordHash)
-                    .WithParam("ProfilePicture", user.ProfilePicture ?? "default.png") // Podrazumevana slika
-                    .WithParam("Bio", user.Bio ?? "New user")
-                    .WithParam("CreatedAt", user.CreatedAt)
-                    .WithParam("IsAdmin", user.IsAdmin);
-
-                await query.ExecuteWithoutResultsAsync();
-
-                // Uspešna registracija
-                return CreatedAtAction(nameof(Register), new { id = user.UserId }, user);
-            }
-            catch (Exception ex)
-            {
-                // Obrada grešaka
-                return StatusCode(500, $"Internal server error: {ex.Message}");
-            }
+            return RedirectToAction("UserProfile");
         }
 
     }
