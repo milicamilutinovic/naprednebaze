@@ -240,7 +240,9 @@ namespace app.Controllers
                     return StatusCode(500, new { error = "Nije moguće kreirati post." });
                 }
 
-                return Ok(new { message = "Post uspešno kreiran.", post });
+                return new JsonResult(new { success = true, post = post });
+
+                //return Ok(new { message = "Post uspešno kreiran.", post });
             }
             catch (Exception ex)
             {

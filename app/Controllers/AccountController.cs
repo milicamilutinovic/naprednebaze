@@ -81,9 +81,16 @@ public class AccountController : Controller
         }
 
     [HttpPost]
-    public async Task<IActionResult> Register(string username, string fullName, string password, string email, string profilePicture, string bio)
+    public async Task<IActionResult> Register(string username, string fullName, string password, string email, IFormFile profilePicture, string bio)
     {
-        // Provera da li korisničko ime već postoji
+        // Check if the file is provided
+        if (profilePicture == null || profilePicture.Length == 0)
+        {
+            ViewBag.Error = "Profile picture is required.";
+            return View();
+        }
+
+        // Check if username already exists
         var existingUser = await _graphClient.Cypher
             .Match("(u:User {username: $Username})")
             .WithParam("Username", username)
@@ -96,23 +103,22 @@ public class AccountController : Controller
             return View();
         }
 
-        // Provera da li email već postoji
-        var existingEmail = await _graphClient.Cypher
-            .Match("(u:User {email: $Email})")
-            .WithParam("Email", email)
-            .Return<int>("count(u)")
-            .ResultsAsync;
-
-        if (existingEmail.Single() > 0)
+        // Save the file to wwwroot/images
+        var uploadsDirectory = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/images");
+        if (!Directory.Exists(uploadsDirectory))
         {
-            ViewBag.Error = "Email already registered.";
-            return View();
+            Directory.CreateDirectory(uploadsDirectory);
         }
 
-       
+        var uniqueFileName = Guid.NewGuid() + Path.GetExtension(profilePicture.FileName);
+        var filePath = Path.Combine(uploadsDirectory, uniqueFileName);
 
+        using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            await profilePicture.CopyToAsync(stream);
+        }
 
-        // Kreiranje novog korisnika
+        // Create the new user
         var user = new User
         {
             UserId = Guid.NewGuid().ToString(),
@@ -120,13 +126,13 @@ public class AccountController : Controller
             FullName = fullName,
             Email = email,
             PasswordHash = password,
-            ProfilePicture = profilePicture,
+            ProfilePicture = "/images/" + uniqueFileName, // Save the relative URL
             Bio = bio,
             CreatedAt = DateTime.UtcNow,
             IsAdmin = false
         };
 
-        // Čuvanje korisnika u Neo4j bazi
+        // Save user to Neo4j
         await _graphClient.Cypher
             .Create("(u:User {userId: $UserId, username: $Username, fullName: $FullName, email: $Email, passwordHash: $PasswordHash, profilePicture: $ProfilePicture, bio: $Bio, createdAt: $CreatedAt, isAdmin: $IsAdmin})")
             .WithParams(new
@@ -143,8 +149,9 @@ public class AccountController : Controller
             })
             .ExecuteWithoutResultsAsync();
 
-        return RedirectToAction("Login"); // Preusmeravanje na stranicu za prijavu
+        return RedirectToAction("Login");
     }
- 
+
+
 
 }
