@@ -18,21 +18,15 @@ namespace app.Controllers
         }
 
         // POST: /like
-        [HttpPost]
+        [HttpPost("LikePost")]
         public async Task<IActionResult> LikePost([FromBody] Like like)
         {
             try
             {
-                // Ensure that both User and Post are provided in the request
                 if (like.user == null || like.post == null)
                 {
                     return BadRequest("User or Post is missing.");
                 }
-
-                // Create a 'LIKES' relationship between the user and post
-                //var query = @"
-                //    MATCH (u:User {userId: $userId}), (p:Post {postId: $postId})
-                //    CREATE (u)-[:LIKES]->(p)";
 
                 var parameters = new
                 {
@@ -40,15 +34,35 @@ namespace app.Controllers
                     postId = like.post.postId
                 };
 
-                // Execute the query without expecting results (no assignment needed)
+                // Proveri da li je korisnik već lajkovao post
+                var alreadyLiked = await _graphClient.Cypher
+                    .Match("(u:User {userId: $userId})", "(p:Post {postId: $postId})")
+                    .Where("(u)-[:LIKES]->(p)")
+                    .WithParams(parameters)
+                    .Return<int>("count(*)")
+                    .ResultsAsync;
+
+                if (alreadyLiked.FirstOrDefault() > 0)
+                {
+                    return BadRequest(new { Error = "User has already liked this post." });
+                }
+
+                // Kreiraj 'LIKE' relaciju i ažuriraj `likeCount`
                 await _graphClient.Cypher
-                                         .Match("(u:User {userId: $userId})", "(p:Post {postId: $postId})")
-                                         .WithParams(new { userId = like.user.UserId, postId = like.post.postId })
-                                         .Create("(u)-[:LIKES]->(p)")
-                                         .ExecuteWithoutResultsAsync();
+                    .Match("(u:User {userId: $userId})", "(p:Post {postId: $postId})")
+                    .WithParams(parameters)
+                    .Create("(u)-[:LIKES]->(p)")
+                    .Set("p.likeCount = coalesce(p.likeCount, 0) + 1") // Inkrementiraj likeCount
+                    .ExecuteWithoutResultsAsync();
 
+                // Vrati ažurirani broj lajkova
+                var updatedLikeCount = await _graphClient.Cypher
+                    .Match("(p:Post {postId: $postId})")
+                    .WithParams(parameters)
+                    .Return<int>("p.likeCount")
+                    .ResultsAsync;
 
-                return Ok(new { Message = "Post liked successfully" });
+                return Ok(new { success = true, likeCount = updatedLikeCount.FirstOrDefault() });
             }
             catch (Exception ex)
             {
@@ -56,27 +70,72 @@ namespace app.Controllers
             }
         }
 
+
         // DELETE: /like
-        // DELETE: /like
-        [HttpDelete]
+        [HttpDelete("UnlikePost")]
         public async Task<IActionResult> UnlikePost([FromBody] Like like)
         {
             try
             {
-                // Ensure that both User and Post are provided in the request
                 if (like.user == null || like.post == null)
                 {
                     return BadRequest("User or Post is missing.");
                 }
 
-                // Remove the 'LIKES' relationship between the user and post
+                var parameters = new
+                {
+                    userId = like.user.UserId,
+                    postId = like.post.postId
+                };
+
+                // Proveri da li je korisnik lajkovao post
+                var alreadyLiked = await _graphClient.Cypher
+                    .Match("(u:User {userId: $userId})", "(p:Post {postId: $postId})")
+                    .Where("(u)-[:LIKES]->(p)") // Proveri da li postoji veza LAJKA
+                    .WithParams(parameters)
+                    .Return<int>("count(*)") // Broj veza između korisnika i posta
+                    .ResultsAsync;
+
+                if (alreadyLiked.FirstOrDefault() == 0)
+                {
+                    return BadRequest(new { Error = "User has not liked this post." });
+                }
+
+                // Obriši 'LIKE' relaciju i ažuriraj `likeCount`
                 await _graphClient.Cypher
                     .Match("(u:User {userId: $userId})-[r:LIKES]->(p:Post {postId: $postId})")
-                    .WithParams(new { userId = like.user.UserId, postId = like.post.postId })
-                    .Delete("r")  // Delete the relationship
+                    .WithParams(parameters)
+                    .Delete("r") // Briši relaciju
+                    .Set("p.likeCount = p.likeCount - 1") // Smanji likeCount
                     .ExecuteWithoutResultsAsync();
 
-                return Ok(new { Message = "Post unliked successfully" });
+                // Vrati ažurirani broj lajkova
+                var updatedLikeCount = await _graphClient.Cypher
+                    .Match("(p:Post {postId: $postId})")
+                    .WithParams(parameters)
+                    .Return<int>("p.likeCount")
+                    .ResultsAsync;
+
+                return Ok(new { success = true, likeCount = updatedLikeCount.FirstOrDefault() });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Error = ex.Message });
+            }
+        }
+        [HttpGet("IsPostLikedByUser")]
+        public async Task<IActionResult> IsPostLikedByUser(string userId, string postId)
+        {
+            try
+            {
+                var isLiked = await _graphClient.Cypher
+                    .Match("(u:User {userId: $userId})", "(p:Post {postId: $postId})")
+                    .Where("(u)-[:LIKES]->(p)")
+                    .WithParams(new { userId, postId })
+                    .Return<int>("count(*)")
+                    .ResultsAsync;
+
+                return Ok(isLiked.FirstOrDefault() > 0);
             }
             catch (Exception ex)
             {

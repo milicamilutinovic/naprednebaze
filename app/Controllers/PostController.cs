@@ -5,6 +5,9 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using app.Models;
 using System.Security.Claims;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Collections;
+using Microsoft.Extensions.Hosting;
 
 namespace app.Controllers
 {
@@ -61,7 +64,7 @@ namespace app.Controllers
         {
             try
             {
-               
+
                 // Ako je userId prosleđen, filtriraj postove tog korisnika
                 if (!string.IsNullOrEmpty(userId))
                 {
@@ -99,6 +102,9 @@ namespace app.Controllers
         {
             try
             {
+                // Log input data
+                Console.WriteLine($"Updating post {postId} with caption: {updatedPost.caption}");
+
                 // Prvo, proverite da li post postoji
                 var query = _graphClient.Cypher
                     .Match("(p:Post)")
@@ -132,14 +138,21 @@ namespace app.Controllers
                     .WithParam("likeCount", post.likeCount)
                     .ExecuteWithoutResultsAsync();
 
-                return Ok(post); // Vraća ažurirani post sa statusom 200 OK
+                // Log successful update
+                Console.WriteLine($"Post {postId} updated successfully.");
+
+                //return Ok(new { success = true, post = post });
+                return new JsonResult(new { success = true, post = post });
+
             }
             catch (Exception ex)
             {
+                // Log error
+                Console.WriteLine($"Error updating post: {ex.Message}");
                 return StatusCode(500, $"Internal server error: {ex.Message}");
+
             }
         }
-
 
         // DELETE: /Post/{id}
         [HttpDelete("{id}")]
@@ -151,24 +164,24 @@ namespace app.Controllers
                 var postExists = await _graphClient.Cypher
                     .Match("(p:Post {postId: $postId})")
                     .WithParam("postId", id)
-                    .Return<int>("count(p)")  // Broj postova sa datim postId
+                    .Return<int>("count(p)")
                     .ResultsAsync;
 
-                if (postExists.Single() == 0)
+                if (postExists.SingleOrDefault() == 0)
                 {
                     return NotFound(new { message = "Post not found" });
                 }
 
-                // Ako post postoji, obrišite ga
-                var query = _graphClient.Cypher
-                    .Match("(p:Post {postId: $postId})")
+                // Brisanje svih veza i samog čvora
+                await _graphClient.Cypher
+                    .Match("(p:Post {postId: $postId})-[r]-()") // Pronalazi sve veze (relacije)
                     .WithParam("postId", id)
-                    .Delete("p")  // Briše čvor posta
+                    .Delete("r, p") // Briše veze i čvor
                     .ExecuteWithoutResultsAsync();
 
-                await query;
+               // return NoContent(); // Uspešno obrisano
+                                      return new JsonResult(new { success = true });
 
-                return NoContent();  // Vraća 204 status kod kada je resurs uspešno obrisan
             }
             catch (Exception ex)
             {
@@ -176,7 +189,7 @@ namespace app.Controllers
             }
         }
 
-       
+
         [HttpPost("AddPost")]
         public async Task<IActionResult> AddPost([FromForm] IFormFile imageURL, [FromForm] string caption)
         {
@@ -252,7 +265,7 @@ namespace app.Controllers
         }
 
     }
- }
+}
 
 
 

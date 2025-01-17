@@ -270,6 +270,29 @@ namespace app.Controllers
             }
             return RedirectToAction("UserProfile");
         }
+        // GET: /User/SearchUsernames
+        [HttpGet("SearchUsernames")]
+        public async Task<IActionResult> SearchUsernames(string query)
+        {
+            try
+            {
+                // Pretraga korisničkih imena prema upitu
+                var queryResult = await _graphClient.Cypher
+                    .Match("(u:User)")
+                    .Where("u.username CONTAINS $query")
+                    .WithParam("query", query)
+                    .Return(u => u.As<User>())
+                    .ResultsAsync;
+
+                var usernames = queryResult.Select(user => user.Username).ToList();
+
+                return Ok(usernames);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Error = ex.Message });
+            }
+        }
 
     }
 }

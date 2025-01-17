@@ -99,8 +99,8 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <input type="text" class="form-control" id="searchBar" placeholder="Search Users" />
-                <ul class="list-group mt-2" id="userList"></ul>
+                <input type="text" class="form-control" id="searchBar" placeholder="Search Users" oninput="searchUsers()" autocomplete="off" />
+                <ul class="list-group mt-2" id="userList" style="display: none;"></ul>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -133,8 +133,88 @@
         </div>
     </div>
 </div>
+<!-- Modal for updating a post -->
+<div class="modal" tabindex="-1" id="updatePostModal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update Post</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="updatePostForm">
+                    <div class="mb-3">
+                        <label for="updateCaption" class="form-label">Caption</label>
+                        <input type="text" class="form-control" id="updateCaption" name="caption">
+                    </div>
+                    <div class="mb-3">
+                        <label for="updateImage" class="form-label">Image URL</label>
+                        <input type="text" class="form-control" id="updateImage" name="imageURL">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Update Post</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Modal for delete confirmation -->
+<div class="modal fade" id="deletePostModal" tabindex="-1" aria-labelledby="deletePostModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deletePostModalLabel">Delete Post</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete this post?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteButton">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <script>
+    async function searchUsers() {
+        const query = document.getElementById("searchBar").value;
+
+        // Ako nije unet nikakav tekst, sakrij padajući meni
+        if (query.length === 0) {
+            document.getElementById("userList").style.display = "none";
+            return;
+        }
+
+        // Poziv na backend API
+        const response = await fetch(`/User/SearchUsernames?query=${query}`);
+        const usernames = await response.json();
+
+        const userList = document.getElementById("userList");
+        userList.innerHTML = '';  // Očisti prethodne rezultate
+
+        // Ako ima korisničkih imena, prikaži padajući meni
+        if (usernames.length > 0) {
+            userList.style.display = "block";
+
+            usernames.forEach(username => {
+                const listItem = document.createElement("li");
+                listItem.classList.add("list-group-item");
+                listItem.textContent = username;
+
+                // Dodaj funkcionalnost da klikom na ime dodate prijatelja
+                listItem.addEventListener('click', () => {
+                    document.getElementById("searchBar").value = username;
+                    userList.style.display = "none";  // Sakrij padajući meni nakon selekcije
+                });
+
+                userList.appendChild(listItem);
+            });
+        } else {
+            userList.style.display = "none";  // Sakrij ako nema rezultata
+        }
+    }
     function submitPost(event) {
         event.preventDefault(); // Prevent the default form behavior
 
@@ -145,21 +225,21 @@
             method: "POST",
             body: formData
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Close the modal
-                const addPostModal = document.getElementById("addPostModal");
-                const modalInstance = bootstrap.Modal.getInstance(addPostModal);
-                modalInstance.hide();
-                loadPosts(); // Reload posts
-            } else {
-                alert("Failed to add post: " + data.error);
-            }
-        })
-        .catch(error => {
-            console.error("Error submitting post:", error);
-        });
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Close the modal
+                    const addPostModal = document.getElementById("addPostModal");
+                    const modalInstance = bootstrap.Modal.getInstance(addPostModal);
+                    modalInstance.hide();
+                    loadPosts(); // Reload posts
+                } else {
+                    alert("Failed to add post: " + data.error);
+                }
+            })
+            .catch(error => {
+                console.error("Error submitting post:", error);
+            });
     }
 
     function loadPosts() {
@@ -175,17 +255,21 @@
                 }
 
                 posts.forEach(post => {
+                    console.log(post.postId); // Proverite vrednost postId
+
                     const listItem = document.createElement("li");
                     listItem.classList.add("list-group-item");
                     listItem.innerHTML = `
-                        <strong>${post.caption}</strong><br/>
-                        <img src="${post.imageURL}" alt="Post Image" class="img-thumbnail post-img" />
-                        <div class="d-flex justify-content-between mt-2">
-                            <button class="btn btn-warning btn-sm" onclick="updatePost('${post.postId}')">Update</button>
-                            <button class="btn btn-danger btn-sm" onclick="deletePost('${post.postId}')">Delete</button>
-                            <button class="btn btn-info btn-sm" onclick="likePost('${post.postId}')">Like</button>
-                        </div>
-                    `;
+                            <strong>${post.caption}</strong><br/>
+                            <img src="${post.imageURL}" alt="Post Image" class="img-thumbnail post-img" />
+                            <div class="d-flex justify-content-between mt-2">
+                                <button class="btn btn-warning btn-sm" onclick="updatePost('${post.postId}')">Update</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${post.postId}')">Delete</button>
+         <button class="btn btn-info btn-sm" onclick="likePost('${post.postId}')">Like</button>
+        <button class="btn btn-danger btn-sm" id="unlikeButton-${post.postId}" onclick="unlikePost('${post.postId}')" style="display: none;">Unlike</button>
+
+        <span id="likeCount-${post.postId}">${post.likeCount}</span> Likes     </div>
+                        `;
                     postList.appendChild(listItem);
                 });
             })
@@ -195,18 +279,88 @@
     }
 
     function updatePost(postId) {
-        // Logic for updating the post (show an update modal or handle the update via API)
-        alert(`Update post with ID: ${postId}`);
+        // Dohvati podatke o postu sa servera
+        fetch(`/PostController/${postId}`)
+            .then(response => response.json())
+            .then(post => {
+                // Popunite modal sa postojećim podacima
+                document.getElementById('updateCaption').value = post.caption;
+                document.getElementById('updateImage').value = post.imageURL;
+
+                // Prikazivanje modala
+                const updatePostModal = new bootstrap.Modal(document.getElementById('updatePostModal'));
+                updatePostModal.show();
+
+                // Dodavanje event listener-a za submit forme
+                document.getElementById('updatePostForm').onsubmit = function (event) {
+                    submitUpdatePost(event, postId);
+                };
+            })
+            .catch(error => {
+                console.error("Error fetching post:", error);
+            });
     }
 
-    function deletePost(postId) {
-        // Confirm and delete the post
-        if (confirm("Are you sure you want to delete this post?")) {
-            fetch(`/PostController/DeletePost?postId=${postId}`, { method: "DELETE" })
+
+    function submitUpdatePost(event, postId) {
+        event.preventDefault(); // Sprečava podrazumevani submit forme
+
+        const updatedPost = {
+            caption: document.getElementById('updateCaption').value,
+            imageURL: document.getElementById('updateImage').value
+        };
+
+        // Slanje PUT zahteva za ažuriranje postojećeg posta
+        fetch(`/PostController/${postId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updatedPost)
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Zatvori modal nakon uspešnog ažuriranja
+                    const updatePostModalElement = document.getElementById('updatePostModal');
+
+                    if (updatePostModalElement) {
+                        // Ako element postoji, inicijalizuj modal
+                        const updatePostModal = new bootstrap.Modal(updatePostModalElement);
+                        updatePostModal.hide(); // Zatvori modal
+                    } else {
+                        console.error('Element sa ID-jem "updatePostModal" nije pronađen!');
+                    }
+                    loadPosts(); // Reload posts after update
+                } else {
+                    alert("Failed to update post: " + data.error);
+                }
+            })
+            .catch(error => {
+                console.error("Error updating post:", error);
+                alert("An error occurred while updating the post.");
+            });
+    }
+
+    let postToDelete = null; // Globalna varijabla za čuvanje ID-ja posta koji treba da se obriše
+
+    // Funkcija koja prikazuje modal za potvrdu brisanja
+    function confirmDelete(postId) {
+        postToDelete = postId; // Zapamti ID posta koji treba obrisati
+        const deletePostModal = new bootstrap.Modal(document.getElementById('deletePostModal'));
+        deletePostModal.show(); // Prikazivanje modala
+    }
+
+    // Funkcija za brisanje posta
+    function deletePost() {
+        if (postToDelete !== null) {
+            fetch(`/PostController/${postToDelete}`, { method: "DELETE" })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        loadPosts(); // Reload posts after deletion
+                        loadPosts(); // Ponovo učitaj postove nakon brisanja
+                        const deletePostModal = bootstrap.Modal.getInstance(document.getElementById('deletePostModal'));
+                        deletePostModal.hide(); // Zatvori modal
                     } else {
                         alert("Failed to delete post: " + data.error);
                     }
@@ -217,20 +371,86 @@
         }
     }
 
+    // Dodaj event listener na dugme za brisanje u modal dialogu
+    document.getElementById('confirmDeleteButton').addEventListener('click', deletePost);
+
+    const currentUserId = '@Model.UserId'; // Dobijen sa servera
+
     function likePost(postId) {
-        // Logic for liking the post
-        fetch(`/LikeController/LikePost?postId=${postId}`, { method: "POST" })
-            .then(response => response.json())
+        fetch(`/Like/LikePost`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                user: { UserId: currentUserId,
+                    ProfilePicture: ""  
+                }, // Zameniti sa stvarnim korisničkim ID
+                post: { postId: postId }
+            })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Server error: ${text}`);
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
+                    // Ažuriraj prikaz broja lajkova
+                    const likeCountElement = document.querySelector(`#likeCount-${postId}`);
+                    if (likeCountElement) {
+                        likeCountElement.textContent = data.likeCount;
+                    }
                     alert("Post liked successfully!");
-                    loadPosts(); // Reload posts to reflect updated like count
                 } else {
-                    alert("Failed to like post: " + data.error);
+                    alert("Failed to like post: " + (data.error || "Unknown error"));
                 }
             })
             .catch(error => {
-                console.error("Error liking post:", error);
+                console.error("Error liking post:", error.message);
+            });
+    }
+    function unlikePost(postId) {
+        fetch(`/Like/UnlikePost`, {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                user: { UserId: currentUserId, ProfilePicture: "" },  // Zameniti sa stvarnim korisničkim ID
+                post: { postId: postId }
+            })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Server error: ${text}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Ažuriraj prikaz broja lajkova
+                    const likeCountElement = document.querySelector(`#likeCount-${postId}`);
+                    if (likeCountElement) {
+                        likeCountElement.textContent = data.likeCount;
+                    }
+
+                    // Sakrij "Unlike" dugme, prikazi "Like" dugme
+                    document.querySelector(`#likeButton-${postId}`).style.display = "inline-block";
+                    document.querySelector(`#unlikeButton-${postId}`).style.display = "none";
+
+                    alert("Post unliked successfully!");
+                } else {
+                    alert("Failed to unlike post: " + (data.error || "Unknown error"));
+                }
+            })
+            .catch(error => {
+                console.error("Error unliking post:", error.message);
             });
     }
 
