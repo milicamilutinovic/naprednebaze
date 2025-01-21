@@ -7,6 +7,8 @@ namespace app.Models
 {
     public class Post
     {
+        [JsonPropertyName("postId")]
+
         public String?  postId { get; set; }
         public String? imageURL { get; set; }
         public String? caption { get; set; }

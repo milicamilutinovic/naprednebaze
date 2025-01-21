@@ -55,6 +55,8 @@
                 </form>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFriendModal">Add Friend</button>
                 <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addPostModal">Add Post</button>
+                <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#updateProfileModal">Update Profile</button>
+
             </div>
 
             <div class="row">
@@ -84,12 +86,35 @@
         </div>
     </main>
 
+
     <!-- Footer -->
     <footer class="bg-dark text-white text-center py-3 mt-auto">
         <p class="mb-0">&copy; 2025 User Profile Page</p>
     </footer>
 </div>
 
+
+@* <!-- Add Comment Modal -->
+<div class="modal fade" id="addCommentModal" tabindex="-1" aria-labelledby="addCommentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addCommentModalLabel">Add Comment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="@Url.Action("AddComment", "Comment")" id="addCommentForm">
+                    <input type="hidden" id="postId" name="postId" />
+                    <div class="mb-3">
+                        <label for="commentContent" class="form-label">Your Comment</label>
+                        <textarea class="form-control" id="commentContent" name="content" rows="3" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Comment</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div> *@
 <!-- Add Friend Modal -->
 <div class="modal fade" id="addFriendModal" tabindex="-1" aria-labelledby="addFriendModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -176,8 +201,267 @@
     </div>
 </div>
 
+<!-- Modal for adding a comment -->
+<div class="modal fade" id="addCommentModal" tabindex="-1" aria-labelledby="addCommentModalLabel" >
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addCommentModalLabel">Add Comment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="handleModalClose()"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addCommentForm">
+                    <div class="mb-3">
+                        <label for="commentContent" class="form-label">Comment</label>
+                        <textarea class="form-control" id="commentContent" rows="3" required></textarea>
+                    </div>
+                    <input type="hidden" id="commentPostId" />
+                    <input type="hidden" id="commentAuthorUserId" />
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitComment()">Add Comment</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal za ažuriranje profila -->
+<div class="modal fade" id="updateProfileModal" tabindex="-1" aria-labelledby="updateProfileModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="updateProfileModalLabel">Update Profile</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="updateProfileForm" method="put" enctype="multipart/form-data" action="/UpdateUser/@Model.UserId">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" value="@Model.Username" required />
+                    </div>
+                    <div class="mb-3">
+                        <label for="bio" class="form-label">Bio</label>
+                        <textarea class="form-control" id="bio" name="bio" rows="3">@Model.Bio</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="profilePicture" class="form-label">Profile Picture</label>
+                        <input type="file" class="form-control" id="profilePicture" name="profilePicture" value="@Model.ProfilePicture"  />
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="submit" class="btn btn-primary" onclick="updateProfile()">Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <script>
+    
+  
+        function updateProfile() {
+            // Pronađi formu
+            const form = document.getElementById("updateProfileForm");
+
+        // Prikupljanje podataka iz forme
+        const formData = new FormData(form);
+        // Ispisivanje sadržaja formData za debugovanje
+        for (let pair of formData.entries()) {
+            console.log(pair[0] + ': ' + pair[1]);
+        }
+
+        // Slanje PUT zahteva sa formData
+        fetch('/User/UpdateUser/' + '@Model.UserId', {
+            method: 'PUT',
+        body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message === "User updated successfully") {
+            // Ako je ažuriranje uspešno, zatvori modal i osveži korisničke podatke
+            $('#updateProfileModal').modal('hide');
+        alert('Profile updated successfully!');
+        location.reload();  // Možeš da osvežiš stranicu kako bi prikazao nove podatke
+
+                } else {
+            alert('Error updating profile: ' + data.message);
+                }
+            })
+            .catch(error => {
+            console.error('Error:', error);
+        alert('There was an error updating your profile.');
+            });
+        }
+
+
+    // function updateProfile() {
+    //     const username = document.getElementById('username').value;
+    //     const bio = document.getElementById('bio').value;
+    //     const profilePicture = document.getElementById('profilePicture').files[0];
+
+    //     const formData = new FormData();
+    //     formData.append('username', username);
+    //     formData.append('bio', bio);
+    //     if (profilePicture) {
+    //         formData.append('profilePicture', profilePicture);
+    //     }
+
+    //     fetch('/User/UpdateUser/' + @Model.UserId, {
+    //         method: 'PUT',
+    //         body: formData
+    //     })
+    //         .then(response => response.json())
+    //         .then(data => {
+    //             if (data.message === "User updated successfully") {
+    //                 // Update the profile data on the page
+    //                 document.querySelector('.profile-container .profile-details p:nth-child(1)').innerText = username;
+    //                 document.querySelector('.profile-container .profile-details p:nth-child(3)').innerText = bio;
+    //                 if (profilePicture) {
+    //                     const reader = new FileReader();
+    //                     reader.onload = function (e) {
+    //                         document.querySelector('.profile-img').src = e.target.result;
+    //                     };
+    //                     reader.readAsDataURL(profilePicture);
+    //                 }
+    //                 alert('Profile updated successfully!');
+    //                 // Close the modal
+    //                 $('#updateModal').modal('hide');
+    //             } else {
+    //                 alert('Error updating profile');
+    //             }
+    //         })
+    //         .catch(error => alert('Error: ' + error));
+    // }
+
+
+    function openCommentModal(postId, authorUserId) {
+        // Postavite postId i authorUserId u skrivena polja
+        document.getElementById("commentPostId").value = postId;
+        document.getElementById("commentAuthorUserId").value = authorUserId;
+
+        // Prikazivanje modala koristeći Bootstrap API
+        const addCommentModal = new bootstrap.Modal(document.getElementById("addCommentModal"));
+        addCommentModal.show();
+
+        // Onemogući interakciju sa pozadinom
+        document.querySelector('.modal-backdrop').style.pointerEvents = 'none';
+    }
+
+    // Funkcija za slanje komentara na server
+    async function submitComment() {
+        const postId = document.getElementById("commentPostId").value;
+        const content = document.getElementById("commentContent").value;
+        const authorUserId = document.getElementById("commentAuthorUserId").value;
+        console.log("Comment content: ", content);  // Dodaj ovu liniju
+
+        // Provera da li je komentar unet
+        if (!content.trim()) {
+            alert("Content cannot be empty.");
+            return;
+        }
+
+        // Podaci koji će biti poslati na server
+        const commentData = {
+            CommentId: "1",  // Dodajte ovu liniju ako je potrebna
+
+            Content: content,
+            Author: { UserId: authorUserId,
+                ProfilePicture: ""
+            },
+            Post: { postId: postId }
+        };
+        console.log(commentData);
+
+        try {
+            // Slanje POST zahteva na server
+            const response = await fetch('/Comment/AddComment', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(commentData)
+            });
+
+            const result = await response.json();
+            console.log(result);  // Ispisivanje odgovora servera
+
+            if (response.ok) {
+                alert("Comment added successfully.");
+                // Zatvorite modal nakon uspešnog dodavanja
+                const addCommentModal = bootstrap.Modal.getInstance(document.getElementById("addCommentModal"));
+                addCommentModal.hide();
+                loadComments(postId);  // Ova funkcija treba da učita nove komentare za post
+            } else {
+                alert(`Error: ${result.Message}`);
+            }
+        } catch (error) {
+            console.error("Error adding comment:", error);
+            alert("An error occurred while adding the comment.");
+        }
+    }
+
+    async function loadComments(postId) {
+        try {
+            if (!postId) {
+                console.error("Invalid postId:", postId);
+                alert("Invalid post ID.");
+                return;
+            }
+
+            console.log("Fetching comments for postId:", postId);
+            const response = await fetch(`/Comment/GetComments/${postId}`);
+
+            // Provera statusnog koda i logovanje odgovora
+            console.log("Response status:", response.status);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error("Error response body:", errorText);
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+            }
+
+            // Provera sirovog odgovora pre nego što pokušamo da ga parsiramo
+            const rawResponse = await response.clone().text(); // Provera sirovog odgovora
+            console.log("Raw response body:", rawResponse);
+
+            let comments;
+            try {
+                comments = JSON.parse(rawResponse); // Parsiranje odgovora u JSON
+            } catch (parseError) {
+                console.error("Failed to parse response as JSON:", parseError);
+                alert("Failed to load comments.");
+                return;
+            }
+            console.log("Parsed comments:", comments);
+
+            const commentsSection = document.getElementById(`commentsSection-${postId}`);
+            if (!commentsSection) {
+                console.error(`Comments section not found for postId: ${postId}`);
+                return;
+            }
+
+            commentsSection.innerHTML = ''; // Očistite postojeće komentare
+
+            comments.forEach(comment => {
+                const commentElement = document.createElement("div");
+                commentElement.classList.add("comment");
+                commentElement.innerHTML = `
+                    <p><strong>${comment.authorName}</strong>: ${comment.content}</p>
+                    <small>${new Date(comment.createdAt).toLocaleString()}</small>
+                `;
+                commentsSection.appendChild(commentElement);
+            });
+        } catch (error) {
+            console.error("Error loading comments:", error);
+            alert("An error occurred while loading comments.");
+        }
+    }
+
+
     async function searchUsers() {
         const query = document.getElementById("searchBar").value;
 
@@ -242,40 +526,54 @@
             });
     }
 
-    function loadPosts() {
-        const userId = '@Model.UserId';
-        fetch(`/PostController/GetPosts?userId=${userId}`)
-            .then(response => response.json())
-            .then(posts => {
-                const postList = document.getElementById("postList");
-                postList.innerHTML = ''; // Clear the existing content
+    async function loadPosts() {
+        const userId = '@Model.UserId'; // Zamenite dinamičkim vrednostima ukoliko nije u razor syntax-u
+        try {
+            const response = await fetch(`/PostController/GetPosts?userId=${userId}`);
+            const posts = await response.json();
 
-                if (posts.length === 0) {
-                    postList.innerHTML = "<li class='list-group-item'>No posts available.</li>";
-                }
+            const postList = document.getElementById("postList");
+            postList.innerHTML = ''; // Očistite postojeći sadržaj
 
-                posts.forEach(post => {
-                    console.log(post.postId); // Proverite vrednost postId
+            if (posts.length === 0) {
+                postList.innerHTML = "<li class='list-group-item'>No posts available.</li>";
+                return;
+            }
 
-                    const listItem = document.createElement("li");
-                    listItem.classList.add("list-group-item");
-                    listItem.innerHTML = `
-                            <strong>${post.caption}</strong><br/>
-                            <img src="${post.imageURL}" alt="Post Image" class="img-thumbnail post-img" />
-                            <div class="d-flex justify-content-between mt-2">
-                                <button class="btn btn-warning btn-sm" onclick="updatePost('${post.postId}')">Update</button>
-        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${post.postId}')">Delete</button>
-         <button class="btn btn-info btn-sm" onclick="likePost('${post.postId}')">Like</button>
-        <button class="btn btn-danger btn-sm" id="unlikeButton-${post.postId}" onclick="unlikePost('${post.postId}')" style="display: none;">Unlike</button>
+            posts.forEach(async post => {
+                const listItem = document.createElement("li");
 
-        <span id="likeCount-${post.postId}">${post.likeCount}</span> Likes     </div>
-                        `;
-                    postList.appendChild(listItem);
-                });
-            })
-            .catch(error => {
-                console.error("Error fetching posts:", error);
+                listItem.classList.add("list-group-item");
+                listItem.innerHTML = `
+                    <strong>${post.caption}</strong><br/>
+                    <img src="${post.imageURL}" alt="Post Image" class="img-thumbnail post-img" />
+                    <div class="d-flex justify-content-between mt-2">
+                        <button class="btn btn-warning btn-sm" onclick="updatePost('${post.postId}')">Update</button>
+                        <button class="btn btn-danger btn-sm" onclick="confirmDelete('${post.postId}')">Delete</button>
+                        <button
+                            class="heart-button btn-sm"
+                            id="likeButton-${post.postId}"
+                            onclick="likePost('${post.postId}')">
+                            &#9829; <!-- Unicode za srce -->
+                        </button>
+                            <button class="btn btn-danger btn-sm" id="unlikeButton-${post.postId}" onclick="unlikePost('${post.postId}')" style="display: none;">Unlike</button>
+                        <button class="btn btn-primary btn-sm" onclick="openCommentModal('${post.postId}', '${post.author}')">Comment</button>
+                        <span id="likeCount-${post.postId}">${post.likeCount}</span> Likes
+                    </div>
+                        <div id="commentsSection-${post.postId}" class="comments-section">
+                Loading comments...
+            </div>
+                `;
+                postList.appendChild(listItem);
+                
+               
+                // loadComments(post.postId).catch(error => {
+                //     console.error(`Error loading comments for post ${post.postId}:`, error);
+                // });
             });
+        } catch (error) {
+            console.error("Error fetching posts:", error);
+        }
     }
 
     function updatePost(postId) {
@@ -377,6 +675,9 @@
     const currentUserId = '@Model.UserId'; // Dobijen sa servera
 
     function likePost(postId) {
+        const button = document.querySelector(`#likeButton-${postId}`);
+        const isLiked = button.classList.contains("liked");
+
         fetch(`/Like/LikePost`, {
             method: "POST",
             headers: {
@@ -400,11 +701,13 @@
             .then(data => {
                 if (data.success) {
                     // Ažuriraj prikaz broja lajkova
+                    button.classList.toggle("liked", data.isLiked); // Dodaj/ukloni klasu "liked"
+
                     const likeCountElement = document.querySelector(`#likeCount-${postId}`);
                     if (likeCountElement) {
                         likeCountElement.textContent = data.likeCount;
                     }
-                    alert("Post liked successfully!");
+                    
                 } else {
                     alert("Failed to like post: " + (data.error || "Unknown error"));
                 }
@@ -472,6 +775,7 @@
     .posts-list, .friends-list {
         max-height: 300px;
         overflow-y: auto;
+
     }
 
     .post-img {
@@ -479,4 +783,22 @@
         height: 100px;
         object-fit: cover;
     }
+
+    .heart-button {
+        background-color: transparent;
+        border: none;
+        font-size: 1.5rem;
+        color: #ccc; /* Sivo za nelajkovano srce */
+        cursor: pointer;
+        transition: color 0.3s ease;
+    }
+
+        .heart-button.liked {
+            color: #ff4757; /* Crveno za lajkovano srce */
+        }
+
+        .heart-button:hover {
+            color: #ff6b81; /* Svetlije crveno kada se prelazi mišem */
+        }
+
 </style>

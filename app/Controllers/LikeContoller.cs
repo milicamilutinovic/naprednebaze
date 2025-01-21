@@ -41,35 +41,53 @@ namespace app.Controllers
                     .WithParams(parameters)
                     .Return<int>("count(*)")
                     .ResultsAsync;
+                bool isLiked = alreadyLiked.FirstOrDefault() > 0;
 
+                // Ako je post već lajkovan, unlikuj ga
                 if (alreadyLiked.FirstOrDefault() > 0)
                 {
-                    return BadRequest(new { Error = "User has already liked this post." });
+                    // Pozovi logiku za unlikovanje
+                    await _graphClient.Cypher
+                        .Match("(u:User {userId: $userId})-[r:LIKES]->(p:Post {postId: $postId})")
+                        .WithParams(parameters)
+                        .Delete("r") // Briši relaciju LAJK
+                        .Set("p.likeCount = coalesce(p.likeCount, 0) - 1") // Dekrementiraj broj lajkova
+                        .ExecuteWithoutResultsAsync();
+
+                    // Vrati ažurirani broj lajkova nakon unlikovanja
+                    var updatedLikeCount = await _graphClient.Cypher
+                        .Match("(p:Post {postId: $postId})")
+                        .WithParams(parameters)
+                        .Return<int>("p.likeCount")
+                        .ResultsAsync;
+
+                    return Ok(new { success = true, likeCount = updatedLikeCount.FirstOrDefault() });
                 }
+                else
+                {
+                    // Ako post nije lajkovan, lajkuj ga
+                    await _graphClient.Cypher
+                        .Match("(u:User {userId: $userId})", "(p:Post {postId: $postId})")
+                        .WithParams(parameters)
+                        .Create("(u)-[:LIKES]->(p)")
+                        .Set("p.likeCount = coalesce(p.likeCount, 0) + 1") // Inkrementiraj broj lajkova
+                        .ExecuteWithoutResultsAsync();
 
-                // Kreiraj 'LIKE' relaciju i ažuriraj `likeCount`
-                await _graphClient.Cypher
-                    .Match("(u:User {userId: $userId})", "(p:Post {postId: $postId})")
-                    .WithParams(parameters)
-                    .Create("(u)-[:LIKES]->(p)")
-                    .Set("p.likeCount = coalesce(p.likeCount, 0) + 1") // Inkrementiraj likeCount
-                    .ExecuteWithoutResultsAsync();
+                    // Vrati ažurirani broj lajkova nakon lajkovanja
+                    var updatedLikeCount = await _graphClient.Cypher
+                        .Match("(p:Post {postId: $postId})")
+                        .WithParams(parameters)
+                        .Return<int>("p.likeCount")
+                        .ResultsAsync;
 
-                // Vrati ažurirani broj lajkova
-                var updatedLikeCount = await _graphClient.Cypher
-                    .Match("(p:Post {postId: $postId})")
-                    .WithParams(parameters)
-                    .Return<int>("p.likeCount")
-                    .ResultsAsync;
-
-                return Ok(new { success = true, likeCount = updatedLikeCount.FirstOrDefault() });
+                    return Ok(new { success = true, likeCount = updatedLikeCount.FirstOrDefault(), isLiked });
+                }
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { Error = ex.Message });
             }
         }
-
 
         // DELETE: /like
         [HttpDelete("UnlikePost")]

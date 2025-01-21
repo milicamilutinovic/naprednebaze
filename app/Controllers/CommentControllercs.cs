@@ -7,11 +7,13 @@ using System.Threading.Tasks;
 using app.Models;
 using Neo4j.Driver;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 
 namespace app.Controllers
 {
-    [ApiController]
     [Route("[controller]")]
+    [ApiController]
+
     public class CommentController : ControllerBase
     {
         private readonly IGraphClient _graphClient;
@@ -22,41 +24,134 @@ namespace app.Controllers
         }
 
         // POST: /Comment
-        [HttpPost]
-        public async Task<IActionResult> CreateComment([FromBody] Comment comment)
+       [HttpPost]
+        [HttpPost("AddComment")]
+
+        public async Task<IActionResult> AddComment([FromBody] Comment comment)
         {
             try
             {
-                if (comment.Author == null || comment.Post == null)
+                Console.WriteLine($"Received Comment Data: {JsonSerializer.Serialize(comment)}");
+
+                if (comment.Author == null || string.IsNullOrEmpty(comment.Author.UserId) ||
+                    comment.Post == null || string.IsNullOrEmpty(comment.Post.postId))
                 {
-                    return BadRequest("Author and Post information are required.");
+                    return BadRequest("Author UserId and PostId are required.");
                 }
 
+                // Proveri postojanje korisnika i posta
+                var existsQuery = await _graphClient.Cypher
+                    .Match("(u:User {userId: $authorId})", "(p:Post {postId: $postId})")
+                    .WithParams(new
+                    {
+                        authorId = comment.Author.UserId,
+                        postId = comment.Post.postId
+                    })
+                    .Return((u, p) => new
+                    {
+                        UserExists = u != null,
+                        PostExists = p != null
+                    })
+                    .ResultsAsync;
 
+                var existsResult = existsQuery.FirstOrDefault();
+
+                if (existsResult == null || !existsResult.UserExists || !existsResult.PostExists)
+                {
+                    return NotFound(new { Message = "Author or Post not found." });
+                }
+
+                // Kreiraj komentar i poveži ga sa korisnikom i postom
+                if (string.IsNullOrEmpty(comment.CommentId))
+                {
+                    comment.CommentId = Guid.NewGuid().ToString();  // Generišite CommentId ako nije prosleđen
+                }
+                var createdAt = DateTime.UtcNow;
 
                 await _graphClient.Cypher
-                                 .Match("(u:User {userId: $authorId})", "(p:Post {postId: $postId})")
-                                 .WithParams(new
-                                 {
-                                     commentId = comment.CommentId,
-                                     content = comment.Content,
-                                     authorId = comment.Author.UserId,
-                                     postId = comment.Post.postId,
-                                     createdAt = comment.CreatedAt
-                                 })
-                                 .Create("(c:Comment {commentId: $commentId, content: $content, createdAt: $createdAt})") // promenjeno
-                                 .Create("(u)-[:AUTHORED]->(c)")
-                                 .Create("(c)-[:BELONGS_TO]->(p)")
-                                 .ExecuteWithoutResultsAsync();
+                    .Match("(u:User {userId: $authorId})", "(p:Post {postId: $postId})")
+                    .WithParams(new
+                    {
+                        comment.CommentId,
+                        content = comment.Content,
+                        authorId = comment.Author.UserId,
+                        postId = comment.Post.postId,
+                        createdAt
+                    })
+                    .Create("(c:Comment {commentId: $CommentId, content: $content, createdAt: $createdAt})")
+                    .Create("(u)-[:AUTHORED]->(c)")
+                    .Create("(c)-[:BELONGS_TO]->(p)")
+                    .ExecuteWithoutResultsAsync();
 
-
-                return Ok(new { Message = "Comment created successfully", Comment = comment });
+                return Ok(new
+                {
+                    Message = "Comment created successfully.",
+                    Comment = new
+                    {
+                        CommentId = comment.CommentId,
+                        Content = comment.Content,
+                        CreatedAt = createdAt,
+                        AuthorId = comment.Author.UserId,
+                        PostId = comment.Post.postId
+                    }
+                });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { Error = ex.Message });
             }
         }
+
+        [HttpGet("GetComments/{postId}")]
+        public async Task<IActionResult> GetComments(string postId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(postId))
+                {
+                    Console.WriteLine("Invalid postId provided.");
+                    return BadRequest(new { Message = "Invalid postId." });
+                }
+
+                // Izvrši upit sa ispravnim povratnim tipom
+                var commentsQuery = await _graphClient.Cypher
+                    .Match("(p:Post {postId: $postId})<-[:BELONGS_TO]-(c:Comment)<-[:AUTHORED]-(u:User)")
+                    .WithParam("postId", postId)
+                    .Return((c, u) => new
+                    {
+                        Comment = c.As<Comment>(),  // Mapiraj ceo objekat Comment
+                        Author = u.As<User>()       // Mapiraj ceo objekat User
+                    })
+                    .ResultsAsync;
+
+                // Proveri da li ima komentara
+                if (commentsQuery == null || !commentsQuery.Any())
+                {
+                    Console.WriteLine($"No comments found for postId: {postId}");
+                    return NotFound(new { Message = "No comments found for the provided postId." });
+                }
+
+                // Mapiraj rezultate u listu sa selektovanim svojstvima
+                var mappedComments = commentsQuery.Select(c => new
+                {
+                    c.Comment.CommentId,           // Ekstraktuj CommentId
+                    c.Comment.Content,             // Ekstraktuj Content
+                    CreatedAt = c.Comment.CreatedAt?.ToString("o") ?? "No Date",  // Ako je null, postavi "No Date"
+                    AuthorName = c.Author.FullName // Ekstraktuj AuthorName
+                }).ToList();
+
+                // Ispis broja pronađenih komentara
+                Console.WriteLine($"Fetched {mappedComments.Count} comments for postId {postId}.");
+                return Ok(mappedComments);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching comments for postId {postId}: {ex}");
+                return StatusCode(500, new { Error = ex.Message });
+            }
+        }
+
+
 
         //da se proveri ova get metoda, varaca mi 404, a u bazi posotij taj podatak
         //NE ZNAM STO NECE!!!!!!!!!!!!!!!!!!!!
