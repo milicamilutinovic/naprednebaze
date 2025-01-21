@@ -238,15 +238,15 @@
             <div class="modal-body">
                 <form id="updateProfileForm" method="put" enctype="multipart/form-data" action="/UpdateUser/@Model.UserId">
                     <div class="mb-3">
-                        <label for="username" class="form-label">Username</label>
-                        <input type="text" class="form-control" id="username" name="username" value="@Model.Username" required />
-                    </div>
-                    <div class="mb-3">
                         <label for="bio" class="form-label">Bio</label>
                         <textarea class="form-control" id="bio" name="bio" rows="3">@Model.Bio</textarea>
                     </div>
                     <div class="mb-3">
                         <label for="profilePicture" class="form-label">Profile Picture</label>
+                        @if (!string.IsNullOrEmpty(Model.ProfilePicture))
+                        {
+                            <img src="@Model.ProfilePicture" alt="Profile Picture" class="img-thumbnail mb-2" width="150" />
+                        }
                         <input type="file" class="form-control" id="profilePicture" name="profilePicture" value="@Model.ProfilePicture"  />
                     </div>
                 </form>
@@ -262,41 +262,43 @@
 
 
 <script>
-    
-  
-        function updateProfile() {
-            // Pronađi formu
-            const form = document.getElementById("updateProfileForm");
+
+
+    function updateProfile() {
+        // Pronađi formu
+        const form = document.getElementById("updateProfileForm");
 
         // Prikupljanje podataka iz forme
         const formData = new FormData(form);
+
         // Ispisivanje sadržaja formData za debugovanje
         for (let pair of formData.entries()) {
             console.log(pair[0] + ': ' + pair[1]);
         }
 
         // Slanje PUT zahteva sa formData
-        fetch('/User/UpdateUser/' + '@Model.UserId', {
+        const userId = "@Model.UserId";  // Zameniti sa stvarnim ID-jem
+        fetch('/User/UpdateUser/' + userId, {
             method: 'PUT',
-        body: formData
-            })
+            body: formData
+        })
             .then(response => response.json())
             .then(data => {
                 if (data.message === "User updated successfully") {
-            // Ako je ažuriranje uspešno, zatvori modal i osveži korisničke podatke
-            $('#updateProfileModal').modal('hide');
-        alert('Profile updated successfully!');
-        location.reload();  // Možeš da osvežiš stranicu kako bi prikazao nove podatke
-
+                    // Ako je ažuriranje uspešno, zatvori modal i osveži korisničke podatke
+                    $('#updateProfileModal').modal('hide');
+                    alert('Profile updated successfully!');
+                    location.reload();  // Osvežava stranicu
                 } else {
-            alert('Error updating profile: ' + data.message);
+                    alert('Error updating profile: ' + data.message);
                 }
             })
             .catch(error => {
-            console.error('Error:', error);
-        alert('There was an error updating your profile.');
+                console.error('Error:', error);
+                alert('There was an error updating your profile.');
             });
-        }
+    }
+
 
 
     // function updateProfile() {

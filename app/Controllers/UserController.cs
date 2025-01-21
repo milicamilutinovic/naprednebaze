@@ -190,11 +190,11 @@ namespace app.Controllers
 
         // PUT: api/User/{id}
         [HttpPut("UpdateUser/{id}")]
-        public async Task<IActionResult> UpdateUser(string id, [FromForm] string username, [FromForm] string bio, [FromForm] IFormFile profilePicture)
+        public async Task<IActionResult> UpdateUser(string id, [FromForm] string bio, [FromForm] IFormFile profilePicture)
         {
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(bio))
+            if (string.IsNullOrEmpty(bio))
             {
-                return BadRequest("Username and Bio are required.");
+                return BadRequest("Bio is required.");
             }
 
             try
@@ -236,9 +236,8 @@ namespace app.Controllers
                 var query = _graphClient.Cypher
                     .Match("(u:User {userId: $UserId})")
                     .WithParam("UserId", id)
-                    .Set("u.username = $Username, u.bio = $Bio" +
+                    .Set("u.bio = $Bio" +
                          (profilePictureUrl != null ? ", u.profilePicture = $ProfilePicture" : ""))
-                    .WithParam("Username", username)
                     .WithParam("Bio", bio)
                     .WithParam("ProfilePicture", profilePictureUrl)
                     .Return<string>("u.userId")
@@ -251,8 +250,6 @@ namespace app.Controllers
                     return StatusCode(500, new { message = "User update failed" });
                 }
 
-              //  HttpContext.User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, username) }));
-
                 return Ok(new { message = "User updated successfully", userId = updatedUser });
             }
             catch (Exception ex)
@@ -260,6 +257,7 @@ namespace app.Controllers
                 return StatusCode(500, new { Error = ex.Message });
             }
         }
+
 
 
         // Action to handle adding a friend
