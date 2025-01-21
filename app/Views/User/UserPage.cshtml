@@ -53,6 +53,13 @@
                 <form method="post" action="@Url.Action("Logout", "Account")">
                     <button type="submit" class="btn btn-danger">Logout</button>
                 </form>
+                <button class="btn btn-success" type="button" onclick="openUpdateUserModal()">Update Profile</button>
+
+
+                <!-- Delete Profile Button -->
+                <button class="btn btn-danger" type="button" onclick="openDeleteUserModal()">Delete Profile</button>
+
+
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFriendModal">Add Friend</button>
                 <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addPostModal">Add Post</button>
             </div>
@@ -88,6 +95,53 @@
     <footer class="bg-dark text-white text-center py-3 mt-auto">
         <p class="mb-0">&copy; 2025 User Profile Page</p>
     </footer>
+</div>
+<!-- Modal for User Deletion Confirmation -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteUserModalLabel">Delete Your Profile</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete your profile? This action cannot be undone.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteUserButton">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Update Profile Modal -->
+<div class="modal fade" id="updateUserModal" tabindex="-1" aria-labelledby="updateUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="updateUserModalLabel">Update Your Profile</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="updateProfileForm" enctype="multipart/form-data">
+                    <input type="hidden" id="userId" value="@Model.UserId" />
+                    <div class="mb-3">
+                        <label for="Bio" class="form-label">Bio</label>
+                        <textarea id="bio" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="ProfilePicture" class="form-label">Profile Picture</label>
+                        <input type="file" id="profilePicture" class="form-control" />
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="saveProfileChangesButton">Save Changes</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Add Friend Modal -->
@@ -175,6 +229,84 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Open the modal for user deletion
+    function openDeleteUserModal() {
+        const userId = '@Model.UserId'; // Replace with the correct Razor variable for the user ID
+
+        fetch(`/User/${userId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Redirect to login or homepage after logout and deletion
+                    window.location.href = '/Account/Login';
+                } else {
+                    alert("Failed to delete user: " + data.error);
+                }
+            })
+            .catch(error => {
+                console.error("Error deleting user:", error);
+            });
+  
+    }
+        // Open Update Profile Modal
+       function openUpdateUserModal() {
+        const modal = new bootstrap.Modal(document.getElementById('updateUserModal'));
+        modal.show();
+    
+
+        document.getElementById('saveProfileChangesButton').addEventListener('click', () => {
+        const userId = document.getElementById('userId').value;
+        const bio = document.getElementById('bio').value;
+        const profilePictureInput = document.getElementById('profilePicture');
+        const formData = new FormData();
+
+        // Append bio to the form data
+        formData.append('bio', bio);
+
+        // Append profile picture to the form data if a file is selected
+        if (profilePictureInput.files[0]) {
+            formData.append('profilePicture', profilePictureInput.files[0]);
+        }
+
+        // Send the form data to the server
+        fetch(`/User/${userId}`, {
+            method: 'PUT',
+            body: formData,
+        })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    alert('Profile updated successfully!');
+                    window.location.reload(); // Reload the page to reflect changes
+                } else {
+                    alert('Failed to update profile: ' + data.message || data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error updating profile:', error);
+                alert('An error occurred while updating your profile.');
+            });
+    });
+
+    }
+</script>
 
 
 <script>
