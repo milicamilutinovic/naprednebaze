@@ -169,7 +169,7 @@ namespace app.Controllers
                     .Return<int>("count(u)")  // Broj korisnika sa datim userId
                     .ResultsAsync;
 
-                if (userExists.Single() == 0)
+                if (userExists.FirstOrDefault() == 0)
                 {
                     return Json(new { success = false, error = "User not found" });
                 }
@@ -204,73 +204,68 @@ namespace app.Controllers
         }
 
         // PUT: api/User/{id}
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateUser(string id, [FromBody] User user)
+        [HttpPut("UpdateUser/{id}")]
+        public async Task<IActionResult> UpdateUser(string id, [FromForm] string bio, [FromForm] IFormFile profilePicture)
         {
-            if (user == null)
+            if (string.IsNullOrEmpty(bio))
             {
-                return BadRequest("User data is required.");
+                return BadRequest("Bio is required.");
             }
 
             try
             {
-                // Prvo proverite da li korisnik postoji u bazi
-                var userExists = await _graphClient.Cypher
-                    .Match("(u:User {userId: $userId})")
-                    .WithParam("userId", id)
-                    .Return<int>("count(u)")  // Broj korisnika sa datim userId
+                // Provera da li korisnik postoji u bazi
+                var existingUser = await _graphClient.Cypher
+                    .Match("(u:User {userId: $UserId})")
+                    .WithParam("UserId", id)
+                    .Return<int>("count(u)")
                     .ResultsAsync;
 
-                if (userExists.Single() == 0)
+                if (existingUser.Single() == 0)
                 {
                     return NotFound(new { message = "User not found" });
                 }
 
-                // Ažuriranje podataka korisnika
-                var query = _graphClient.Cypher
-                    .Match("(u:User {userId: $userId})")
-                    .WithParam("userId", id)
-                    .Set("u.username = $Username, u.fullName = $FullName, u.email = $Email, u.passwordHash = $PasswordHash, u.profilePicture = $ProfilePicture, u.bio = $Bio, u.isAdmin = $IsAdmin")
-                    .WithParam("Username", user.Username)
-                    .WithParam("FullName", user.FullName)
-                    .WithParam("Email", user.Email)
-                    .WithParam("PasswordHash", user.PasswordHash)
-                    .WithParam("ProfilePicture", user.ProfilePicture)
-                    .WithParam("Bio", user.Bio)
-                    .WithParam("IsAdmin", user.IsAdmin)
-                    .Return<string>("u.userId")  // Vraća userId korisnika
-                    .ResultsAsync;
+                // Spremanje slike, ako je poslata
+                string profilePictureUrl = null;
+                if (profilePicture != null)
+                {
+                    var uploadsDirectory = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/images");
+                    if (!Directory.Exists(uploadsDirectory))
+                    {
+                        Directory.CreateDirectory(uploadsDirectory);
+                    }
 
-                    // Create a unique file name for the uploaded image
                     var uniqueFileName = Guid.NewGuid() + Path.GetExtension(profilePicture.FileName);
                     var filePath = Path.Combine(uploadsDirectory, uniqueFileName);
 
-                    // Save the file to the server
-                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    using (var fileStream = new FileStream(filePath, FileMode.Create))
                     {
-                        await profilePicture.CopyToAsync(stream);
+                        await profilePicture.CopyToAsync(fileStream);
                     }
 
-                    profilePicturePath = "/images/" + uniqueFileName;
+                    profilePictureUrl = $"/images/{uniqueFileName}";
                 }
 
-                // Update user in the database
-                await _graphClient.Cypher
-                    .Match("(u:User {userId: $userId})")
-                    .WithParam("userId", id)
-                    .Set("u.bio = $Bio, u.profilePicture = $ProfilePicture")
+                // Ažuriranje korisnika u bazi podataka
+                var query = _graphClient.Cypher
+                    .Match("(u:User {userId: $UserId})")
+                    .WithParam("UserId", id)
+                    .Set("u.bio = $Bio" +
+                         (profilePictureUrl != null ? ", u.profilePicture = $ProfilePicture" : ""))
                     .WithParam("Bio", bio)
-                    .WithParam("ProfilePicture", profilePicturePath ?? string.Empty)
-                    .ExecuteWithoutResultsAsync();
-
-                // Fetch the updated user to ensure changes are reflected
-                var updatedUser = await _graphClient.Cypher
-                    .Match("(u:User {userId: $userId})")
-                    .WithParam("userId", id)
-                    .Return<User>("u")
+                    .WithParam("ProfilePicture", profilePictureUrl)
+                    .Return<string>("u.userId")
                     .ResultsAsync;
 
-                return Json(new { success = true, user = updatedUser.FirstOrDefault() });
+                var updatedUser = query.Result.FirstOrDefault();
+
+                if (updatedUser == null)
+                {
+                    return StatusCode(500, new { message = "User update failed" });
+                }
+
+                return Ok(new { message = "User updated successfully", userId = updatedUser });
             }
             catch (Exception ex)
             {
