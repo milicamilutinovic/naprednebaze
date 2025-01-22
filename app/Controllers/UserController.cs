@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using app.Models;
 using Neo4j.Driver;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 
 namespace app.Controllers
 {
@@ -159,6 +160,8 @@ namespace app.Controllers
         {
             try
             {
+                //string? userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
                 // Proverite da li korisnik postoji
                 var userExists = await _graphClient.Cypher
                     .Match("(u:User {userId: $userId})")
@@ -166,9 +169,9 @@ namespace app.Controllers
                     .Return<int>("count(u)")  // Broj korisnika sa datim userId
                     .ResultsAsync;
 
-                if (userExists.Single() == 0)
+                if (userExists.FirstOrDefault() == 0)
                 {
-                    return NotFound(new { message = "User not found" });
+                    return Json(new { success = false, error = "User not found" });
                 }
 
                 // Ako korisnik postoji, obrišite ga
@@ -179,8 +182,20 @@ namespace app.Controllers
                     .ExecuteWithoutResultsAsync();
 
                 await query;
+                _ = HttpContext.SignOutAsync();
+                HttpContext.Session.Clear();
+                foreach (var cookie in Request.Cookies.Keys)
+                {
+                    Response.Cookies.Delete(cookie, new CookieOptions
+                    {
+                        Path = "/",
+                        Domain = "https://localhost:7010", // Set to your app's domain
+                    });
+                }
 
-                return NoContent();  // Vraća 204 status kod kada je resurs uspešno obrisan
+                //return NoContent();  // Vraća 204 status kod kada je resurs uspešno obrisan
+                // Return success response
+                return Json(new { success = true });
             }
             catch (Exception ex)
             {
