@@ -119,10 +119,17 @@ namespace app.Controllers
                     .WithParam("postId", postId)
                     .Return((c, u) => new
                     {
-                        Comment = c.As<Comment>(),  // Mapiraj ceo objekat Comment
-                        Author = u.As<User>()       // Mapiraj ceo objekat User
+                        Comment = c.As<Comment>(),
+                        Author = u.As<User>()
                     })
                     .ResultsAsync;
+
+                // Logujte svaki rezultat da proverite šta je vraćeno
+                foreach (var result in commentsQuery)
+                {
+                    Console.WriteLine($"CommentId: {result.Comment.CommentId}, Content: {result.Comment.Content}");
+                    Console.WriteLine($"AuthorName: {result.Author.FullName}");
+                }
 
                 // Proveri da li ima komentara
                 if (commentsQuery == null || !commentsQuery.Any())
@@ -134,10 +141,10 @@ namespace app.Controllers
                 // Mapiraj rezultate u listu sa selektovanim svojstvima
                 var mappedComments = commentsQuery.Select(c => new
                 {
-                    c.Comment.CommentId,           // Ekstraktuj CommentId
-                    c.Comment.Content,             // Ekstraktuj Content
-                    CreatedAt = c.Comment.CreatedAt?.ToString("o") ?? "No Date",  // Ako je null, postavi "No Date"
-                    AuthorName = c.Author.FullName // Ekstraktuj AuthorName
+                    CommentId = c.Comment.CommentId,
+                    Content = c.Comment.Content,
+                    CreatedAt = c.Comment.CreatedAt?.ToString("o") ?? "No Date",
+                    AuthorName = c.Author.FullName
                 }).ToList();
 
                 // Ispis broja pronađenih komentara
