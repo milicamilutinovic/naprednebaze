@@ -141,6 +141,10 @@ namespace app.Controllers
                     return NotFound("User not found");
                 }
 
+                var userId = user.UserId; // Pretpostavljamo da klasa User ima svojstvo UserId
+
+                // Možete proslediti userId kao deo ViewData ili modela
+                ViewData["UserId"] = userId;
                 // Vraćamo korisničke podatke na view
                 return View(user);
             }
@@ -152,6 +156,94 @@ namespace app.Controllers
         }
 
 
+        [HttpGet("/User/UserPage/{username}")]
+        public async Task<IActionResult> UserPage(string username)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(username))
+                {
+                    return BadRequest("Username is required.");
+                }
+
+                var query = _graphClient.Cypher
+                    .Match("(u:User {username: $username})")
+                    .WithParam("username", username)
+                    .Return(u => u.As<User>())
+                    .ResultsAsync;
+
+                var result = await query;
+                if (!result.Any())
+                {
+                    return NotFound("No user found with the given username.");
+                }
+
+                var user = result.FirstOrDefault();
+                if (user == null)
+                {
+                    return NotFound("User not found.");
+                }
+
+                return View(user);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Error = ex.Message });
+            }
+        }
+
+        [HttpGet("/User/Users/{username}")]
+        public async Task<IActionResult> Users(string username)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(username))
+                {
+                    return BadRequest("Username is required.");
+                }
+
+                var query = _graphClient.Cypher
+     .Match("(u:User {username: $username})")
+     .WithParam("username", username)
+     .Return(u => new
+     {
+         UserId = u.As<User>().UserId,
+         Username = u.As<User>().Username,
+         FullName = u.As<User>().FullName,
+         Bio = u.As<User>().Bio,
+         ProfilePicture = u.As<User>().ProfilePicture
+     })
+     .ResultsAsync;
+
+                var result = await query;
+                if (!result.Any())
+                {
+                    return NotFound("No user found with the given username.");
+                }
+
+                var user = result.FirstOrDefault();
+                if (user == null)
+                {
+                    return NotFound("User not found.");
+                }
+
+                // Mapirajte vrednosti na model User
+                var userModel = new User
+                {
+                    UserId = user.UserId, // Pretpostavka da je id u nekom numeričkom formatu
+                    Username = user.Username,
+                    FullName = user.FullName,
+                    Bio = user.Bio,
+                    ProfilePicture = user.ProfilePicture
+                };
+
+                return View(userModel);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Error = ex.Message });
+            }
+        }
 
 
         // DELETE: api/User/{id}
@@ -305,27 +397,23 @@ namespace app.Controllers
             return RedirectToAction("UserProfile");
         }
         // GET: /User/SearchUsernames
-        [HttpGet("SearchUsernames")]
+        [HttpGet("/User/SearchUsernames")]
         public async Task<IActionResult> SearchUsernames(string query)
         {
-            try
+            if (string.IsNullOrEmpty(query))
             {
-                // Pretraga korisničkih imena prema upitu
-                var queryResult = await _graphClient.Cypher
-                    .Match("(u:User)")
-                    .Where("u.username CONTAINS $query")
-                    .WithParam("query", query)
-                    .Return(u => u.As<User>())
-                    .ResultsAsync;
-
-                var usernames = queryResult.Select(user => user.Username).ToList();
-
-                return Ok(usernames);
+                return BadRequest("Query cannot be empty.");
             }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { Error = ex.Message });
-            }
+
+            var users = await _graphClient.Cypher
+                .Match("(u:User)")
+                .Where("u.username CONTAINS $query")
+                .WithParam("query", query)
+                .Return(u => u.As<User>())
+                .ResultsAsync;
+
+            var usernames = users.Select(u => u.Username).ToList();
+            return Ok(usernames);
         }
 
     }

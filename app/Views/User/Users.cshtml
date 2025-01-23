@@ -1,7 +1,7 @@
 ﻿@model app.Models.User
 
 @{
-    ViewData["Title"] = "User Profile";
+    ViewData["Title"] = "Users";
 }
 
 <div class="container-fluid d-flex flex-column vh-100">
@@ -9,6 +9,7 @@
     <header class="bg-primary text-white text-center py-3">
         <h1 class="display-5">User Profile</h1>
     </header>
+    <input type="hidden" id="loggedInUserId" value="@ViewData["UserId"]">
 
     <!-- Main Content -->
     <main class="flex-grow-1 overflow-auto py-4">
@@ -49,17 +50,7 @@
             </div>
 
             <!-- Buttons -->
-            <div class="d-flex flex-wrap gap-2 justify-content-center mb-4">
-                <form method="post" action="@Url.Action("Logout", "Account")">
-                    <button type="submit" class="btn btn-danger">Logout</button>
-                </form>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFriendModal">Add Friend</button>
-                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addPostModal">Add Post</button>
-                <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#updateProfileModal">Update Profile</button>
-                <button class="btn btn-danger" type="button" onclick="openDeleteUserModal()">Delete Profile</button>
-
-
-            </div>
+            
 
             <div class="row">
                 <!-- Friends List -->
@@ -266,7 +257,7 @@
                         {
                             <img src="@Model.ProfilePicture" alt="Profile Picture" class="img-thumbnail mb-2" width="150" />
                         }
-                        <input type="file" class="form-control" id="profilePicture" name="profilePicture" value="@Model.ProfilePicture"  />
+                        <input type="file" class="form-control" id="profilePicture" name="profilePicture" value="@Model.ProfilePicture" />
                     </div>
                 </form>
             </div>
@@ -279,6 +270,7 @@
     </div>
 </div>
 
+<input type="hidden" id="loggedInUserId" value="@ViewData["UserId"]">
 
 <script>
 
@@ -389,9 +381,9 @@
 
 
     function openCommentModal(postId, authorUserId) {
-
         // Postavite postId i authorUserId u skrivena polja
         document.getElementById("commentPostId").value = postId;
+
         document.getElementById("commentAuthorUserId").value = authorUserId;
 
         // Prikazivanje modala koristeći Bootstrap API
@@ -406,7 +398,8 @@
     async function submitComment() {
         const postId = document.getElementById("commentPostId").value;
         const content = document.getElementById("commentContent").value;
-        const authorUserId = document.getElementById("commentAuthorUserId").value;
+
+       const authorUserId = document.getElementById("commentAuthorUserId").value;
         console.log("Comment content: ", content);  // Dodaj ovu liniju
 
         // Provera da li je komentar unet
@@ -537,25 +530,23 @@
                 const listItem = document.createElement("li");
                 listItem.classList.add("list-group-item");
                 listItem.innerHTML = `
-                        <strong>${post.caption}</strong><br/>
-                        <img src="${post.imageURL}" alt="Post Image" class="img-thumbnail post-img" />
-                        <div class="d-flex justify-content-between mt-2">
-                            <button class="btn btn-warning btn-sm" onclick="updatePost('${post.postId}')">Update</button>
-                            <button class="btn btn-danger btn-sm" onclick="confirmDelete('${post.postId}')">Delete</button>
-                            <button
-                                class="heart-button btn-sm"
-                                id="likeButton-${post.postId}"
-                                onclick="likePost('${post.postId}')">
-                                &#9829; <!-- Unicode za srce -->
-                            </button>
-                            <button class="btn btn-danger btn-sm" id="unlikeButton-${post.postId}" onclick="unlikePost('${post.postId}')" style="display: none;">Unlike</button>
-                            <button class="btn btn-primary btn-sm" onclick="openCommentModal('${post.postId}', '${post.author}')">Comment</button>
-                            <span id="likeCount-${post.postId}">${post.likeCount}</span> Likes
-                        </div>
-                        <div id="commentsSection-${post.postId}" class="comments-section">
-                            Loading comments...
-                        </div>
-                    `;
+                            <strong>${post.caption}</strong><br/>
+                            <img src="${post.imageURL}" alt="Post Image" class="img-thumbnail post-img" />
+                            <div class="d-flex justify-content-between mt-2">
+                                <button
+                                    class="heart-button btn-sm"
+                                    id="likeButton-${post.postId}"
+                                    onclick="likePost('${post.postId}')">
+                                    &#9829; <!-- Unicode za srce -->
+                                </button>
+                                <button class="btn btn-danger btn-sm" id="unlikeButton-${post.postId}" onclick="unlikePost('${post.postId}')" style="display: none;">Unlike</button>
+                                <button class="btn btn-primary btn-sm" onclick="openCommentModal('${post.postId}', '${post.author}')">Comment</button>
+                                <span id="likeCount-${post.postId}">${post.likeCount}</span> Likes
+                            </div>
+                            <div id="commentsSection-${post.postId}" class="comments-section">
+                                Loading comments...
+                            </div>
+                        `;
                 postList.appendChild(listItem);
 
                 // Pozivanje funkcije za učitavanje komentara nakon što post bude prikazan
@@ -613,9 +604,9 @@
                 const commentElement = document.createElement("div");
                 commentElement.classList.add("comment");
                 commentElement.innerHTML = `
-                        <p><strong>${comment.authorName}</strong>: ${comment.content}</p>
-                        <small>${new Date(comment.createdAt).toLocaleString()}</small>
-                    `;
+                            <p><strong>${comment.authorName}</strong>: ${comment.content}</p>
+                            <small>${new Date(comment.createdAt).toLocaleString()}</small>
+                        `;
                 commentsSection.appendChild(commentElement);
             });
         } catch (error) {
@@ -726,6 +717,7 @@
     document.getElementById('confirmDeleteButton').addEventListener('click', deletePost);
 
     const currentUserId = '@Model.UserId'; // Dobijen sa servera
+    const loggedInUserId = document.getElementById("loggedInUserId").value;
 
     function likePost(postId) {
         const button = document.querySelector(`#likeButton-${postId}`);
@@ -737,8 +729,9 @@
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                user: { UserId: currentUserId,
-                    ProfilePicture: ""  
+                user: {
+                    UserId: currentUserId,
+                    ProfilePicture: ""
                 }, // Zameniti sa stvarnim korisničkim ID
                 post: { postId: postId }
             })
@@ -760,7 +753,7 @@
                     if (likeCountElement) {
                         likeCountElement.textContent = data.likeCount;
                     }
-                    
+
                 } else {
                     alert("Failed to like post: " + (data.error || "Unknown error"));
                 }
@@ -828,7 +821,6 @@
     .posts-list, .friends-list {
         max-height: 300px;
         overflow-y: auto;
-
     }
 
     .post-img {

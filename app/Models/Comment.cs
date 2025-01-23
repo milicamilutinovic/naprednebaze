@@ -1,15 +1,16 @@
 ﻿using app.Models;
+using Newtonsoft.Json;
 using System.Text.Json.Serialization;
 
 public class Comment
 {
-    [JsonPropertyName("commentId")]
+    [JsonProperty("commentId")]
     public string CommentId { get; set; }
 
-    [JsonPropertyName("content")]
+    [JsonProperty("content")]
     public string Content { get; set; }
 
-    [JsonPropertyName("createdAt")]
+    [JsonProperty("createdAt")]
     public DateTime? CreatedAt { get; set; }
 
     // Ove atribute možete ostaviti praznim ako nisu deo odgovora iz baze
