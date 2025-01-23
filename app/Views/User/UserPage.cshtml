@@ -50,15 +50,18 @@
 
             <!-- Buttons -->
             <div class="d-flex flex-wrap gap-2 justify-content-center mb-4">
-                <form method="post" action="@Url.Action("Logout", "Account")">
-                    <button type="submit" class="btn btn-danger">Logout</button>
-                </form>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFriendModal">Add Friend</button>
-                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addPostModal">Add Post</button>
-                <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#updateProfileModal">Update Profile</button>
-                <button class="btn btn-danger" type="button" onclick="openDeleteUserModal()">Delete Profile</button>
+                @if (User.Identity.IsAuthenticated && User.Identity.Name == Model.Username) // Check if the user is authenticated and is the profile owner
+                {
+                    <form method="post" action="@Url.Action("Logout", "Account")">
+                        <button type="submit" class="btn btn-danger">Logout</button>
+                    </form>
 
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addFriendModal">Add Friend</button>
+                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addPostModal">Add Post</button>
+                    <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#updateProfileModal">Update Profile</button>
+                    <button class="btn btn-danger" type="button" onclick="openDeleteUserModal()">Delete Profile</button>
 
+                }
             </div>
 
             <div class="row">
@@ -482,7 +485,7 @@
 
                 // Redirektuj na stranicu korisnika kada se klikne na njegovo ime
                 listItem.addEventListener('click', () => {
-                    window.location.href = `/User/Users/${username}`;
+                    window.location.href = `/User/UserPage/${usernames}`;
                 });
 
                 userList.appendChild(listItem);
