@@ -8,6 +8,7 @@ using app.Models;
 using Neo4j.Driver;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Security.Claims;
 
 namespace app.Controllers
 {
@@ -38,13 +39,15 @@ namespace app.Controllers
                 {
                     return BadRequest("Author UserId and PostId are required.");
                 }
+                var loggedInUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+                comment.Author = new User { UserId = loggedInUserId };
 
                 // Proveri postojanje korisnika i posta
                 var existsQuery = await _graphClient.Cypher
                     .Match("(u:User {userId: $authorId})", "(p:Post {postId: $postId})")
                     .WithParams(new
                     {
-                        authorId = comment.Author.UserId,
+                        authorId = loggedInUserId,
                         postId = comment.Post.postId
                     })
                     .Return((u, p) => new
@@ -74,7 +77,7 @@ namespace app.Controllers
                     {
                         comment.CommentId,
                         content = comment.Content,
-                        authorId = comment.Author.UserId,
+                        authorId = loggedInUserId,
                         postId = comment.Post.postId,
                         createdAt
                     })
@@ -91,7 +94,7 @@ namespace app.Controllers
                         CommentId = comment.CommentId,
                         Content = comment.Content,
                         CreatedAt = createdAt,
-                        AuthorId = comment.Author.UserId,
+                        AuthorId = loggedInUserId,
                         PostId = comment.Post.postId
                     }
                 });

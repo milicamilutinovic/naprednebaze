@@ -3,6 +3,7 @@ using Neo4jClient;
 using System;
 using System.Threading.Tasks;
 using app.Models;
+using System.Security.Claims;
 
 namespace app.Controllers
 {
@@ -27,6 +28,7 @@ namespace app.Controllers
                 {
                     return BadRequest("User or Post is missing.");
                 }
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
                 var parameters = new
                 {
