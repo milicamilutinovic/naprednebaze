@@ -735,7 +735,7 @@
     // Dodaj event listener na dugme za brisanje u modal dialogu
     document.getElementById('confirmDeleteButton').addEventListener('click', deletePost);
 
-    const currentUserId = '@Model.UserId'; // Dobijen sa servera
+    const currentUserId = '@User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value';
 
     function likePost(postId) {
         const button = document.querySelector(`#likeButton-${postId}`);

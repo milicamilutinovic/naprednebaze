@@ -28,11 +28,11 @@ namespace app.Controllers
                 {
                     return BadRequest("User or Post is missing.");
                 }
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
 
                 var parameters = new
                 {
-                    userId = like.user.UserId,
+                    userId,
                     postId = like.post.postId
                 };
 
