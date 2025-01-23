@@ -416,5 +416,32 @@ namespace app.Controllers
             return Ok(usernames);
         }
 
+
+
+        [HttpGet("AllUsers")]
+        public async Task<IActionResult> GetAllUsersExceptLoggedIn(string loggedInUserId)
+        {
+            try
+            {
+                // Query to fetch all users except the logged-in user
+                var query = _graphClient.Cypher
+                    .Match("(u:User)")
+                    .Where("u.userId <> $loggedInUserId")
+                    .WithParam("loggedInUserId", loggedInUserId)
+                    .Return(u => u.As<User>())
+                    .ResultsAsync;
+
+                var users = await query;
+
+                // Return the list of users
+                return Ok(users);
+            }
+            catch (Exception ex)
+            {
+                // Handle exceptions
+                return StatusCode(500, new { Error = ex.Message });
+            }
+        }
+
     }
 }

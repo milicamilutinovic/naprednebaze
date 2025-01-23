@@ -1,8 +1,10 @@
-﻿@{
+﻿@model app.Models.User
+@{
     ViewData["Title"] = "Home";
-
-    // Provera da li je korisnik ulogovan
     var userName = User.Identity.IsAuthenticated ? User.Identity.Name : null;
+    var loggedInUserId = User.Identity.IsAuthenticated
+        ? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+        : null;
 }
 
 <h1 class="text-center my-5">
@@ -52,8 +54,67 @@
     </div>
 </nav>
 
+<div class="container mt-5">
+    <h2>All Users</h2>
+    <ul id="user-list" class="list-group">
+        <!-- Dinamički lista korisnika će biti dodata ovde -->
+    </ul>
+</div>
+
 <footer class="footer bg-dark text-white text-center py-3 mt-5">
     <div class="container">
         &copy; 2024 My Application - <a href="/Home/Privacy" class="text-white">Privacy</a>
     </div>
 </footer>
+
+<div class="container mt-5">
+    <h2>All Users</h2>
+    <ul id="user-list" class="list-group">
+        <!-- Users will be dynamically added here -->
+    </ul>
+</div>
+
+<script>
+    // Fetch the logged-in user's ID from Razor
+    const loggedInUserId = '@loggedInUserId';
+
+            async function fetchUsers() {
+        try {
+            const response = await fetch(`/User/AllUsers?loggedInUserId=${loggedInUserId}`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch users');
+            }
+
+            const users = await response.json();
+            const userList = document.getElementById('user-list');
+
+            // Dinamički dodaj korisnike u listu
+            users.forEach(user => {
+                const listItem = document.createElement('li');
+                listItem.className = 'list-group-item';
+
+                // Kreiranje linka ka stranici korisnika
+                const userLink = document.createElement('a');
+                userLink.href = `/User/UserPage?username=${user.username}`;  // Prosleđivanje username kao parametar
+                userLink.textContent = `${user.fullName} (${user.email})`;
+                userLink.className = 'text-decoration-none text-dark';
+
+                // Dodavanje event listener-a da preusmeri korisnika na njegovu stranicu
+                userLink.addEventListener('click', (event) => {
+                    event.preventDefault(); // Sprečava default ponašanje linka
+                    window.location.href = `/User/UserPage/${user.username}`; // Redirektuje na korisničku stranicu sa username-om
+                });
+
+                listItem.appendChild(userLink);
+                userList.appendChild(listItem);
+            });
+        } catch (error) {
+            console.error('Error fetching users:', error);
+        }
+    }
+
+
+
+    // Fetch users when the page loads
+    window.onload = fetchUsers;
+</script>
