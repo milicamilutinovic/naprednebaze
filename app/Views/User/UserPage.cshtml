@@ -1,4 +1,5 @@
 ﻿@model app.Models.User
+@using System.Security.Claims
 
 @{
     ViewData["Title"] = "User Profile";
@@ -239,6 +240,8 @@
                     </div>
                     <input type="hidden" id="commentPostId" />
                     <input type="hidden" id="commentAuthorUserId" />
+                    <input type="hidden" id="loggedInUserId" value="@User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value" />
+
                 </form>
             </div>
             <div class="modal-footer">
@@ -409,7 +412,7 @@
     async function submitComment() {
         const postId = document.getElementById("commentPostId").value;
         const content = document.getElementById("commentContent").value;
-        const authorUserId = document.getElementById("commentAuthorUserId").value;
+     //   const authorUserId = document.getElementById("commentAuthorUserId").value;
         console.log("Comment content: ", content);  // Dodaj ovu liniju
 
         // Provera da li je komentar unet
@@ -417,6 +420,7 @@
             alert("Content cannot be empty.");
             return;
         }
+        const loggedInUserId = document.getElementById("loggedInUserId").value;
 
         // Podaci koji će biti poslati na server
         const commentData = {
@@ -424,7 +428,7 @@
 
             Content: content,
             Author: {
-                UserId: authorUserId,
+                UserId: loggedInUserId,
                 ProfilePicture: ""
             },
             Post: { postId: postId }
@@ -543,8 +547,11 @@
                         <strong>${post.caption}</strong><br/>
                         <img src="${post.imageURL}" alt="Post Image" class="img-thumbnail post-img" />
                         <div class="d-flex justify-content-between mt-2">
+    @if (User.Identity.IsAuthenticated && User.Identity.Name == Model.Username) // Check if the user is authenticated and is the profile owner
+    {
                             <button class="btn btn-warning btn-sm" onclick="updatePost('${post.postId}')">Update</button>
                             <button class="btn btn-danger btn-sm" onclick="confirmDelete('${post.postId}')">Delete</button>
+    }
                             <button
                                 class="heart-button btn-sm"
                                 id="likeButton-${post.postId}"
@@ -728,7 +735,7 @@
     // Dodaj event listener na dugme za brisanje u modal dialogu
     document.getElementById('confirmDeleteButton').addEventListener('click', deletePost);
 
-    const currentUserId = '@Model.UserId'; // Dobijen sa servera
+    const currentUserId = '@User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value';
 
     function likePost(postId) {
         const button = document.querySelector(`#likeButton-${postId}`);
