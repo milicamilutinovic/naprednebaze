@@ -107,6 +107,7 @@ namespace app.Controllers
                 return StatusCode(500, new { Error = ex.Message });
             }
         }
+
         [HttpGet("/User/UserPage")]
         public async Task<IActionResult> UserPage()
         {
@@ -368,54 +369,78 @@ namespace app.Controllers
 
 
         // Action to handle adding a friend
-        [HttpPost]
-        public async Task<IActionResult> AddFriend(string username)
+        [HttpPost("AddFriend")]
+        public async Task<IActionResult> AddFriend(string currentUserId, string friendUsername)
         {
+            // Fetch the current user
             var currentUser = (await _graphClient.Cypher
-                .Match("(u:User {username: $Username})")
-                .WithParam("Username", User.Identity.Name)
+                .Match("(u:User {userId: $UserId})")
+                .WithParam("UserId", currentUserId)
                 .Return(u => u.As<User>())
                 .ResultsAsync)
                 .FirstOrDefault();
 
+            // Fetch the friend user
             var friend = (await _graphClient.Cypher
                 .Match("(u:User {username: $Username})")
-                .WithParam("Username", username)
+                .WithParam("Username", friendUsername)
                 .Return(u => u.As<User>())
                 .ResultsAsync)
                 .FirstOrDefault();
 
-            if (friend != null && currentUser != null)
+            // Ensure both users exist
+            if (currentUser == null || friend == null)
             {
-                // Create a relationship between currentUser and friend
-                await _graphClient.Cypher
-                    .Match("(u:User {userId: $CurrentUserId}), (f:User {userId: $FriendUserId})")
-                    .WithParams(new { CurrentUserId = currentUser.UserId, FriendUserId = friend.UserId })
-                    .Merge("(u)-[:FRIEND]->(f)") // Create FRIEND relationship
-                    .ExecuteWithoutResultsAsync();
-            }
-            return RedirectToAction("UserProfile");
-        }
-        // GET: /User/SearchUsernames
-        [HttpGet("/User/SearchUsernames")]
-        public async Task<IActionResult> SearchUsernames(string query)
-        {
-            if (string.IsNullOrEmpty(query))
-            {
-                return BadRequest("Query cannot be empty.");
+                return BadRequest(new { success = false, message = "User not found." });
             }
 
+            // Check if they are already friends
+            var existingFriendship = await _graphClient.Cypher
+                .Match("(u:User {userId: $currentUserId})-[r:FRIEND]->(f:User {userId: $friendId})")
+                .WithParams(new { currentUserId = currentUser.UserId, friendId = friend.UserId })
+                .Return(r => r.As<object>()) // Any relationship will do
+                .ResultsAsync;
+
+            if (existingFriendship.Any())
+            {
+                return BadRequest(new { success = false, message = "Users are already friends." });
+            }
+
+            // Create the friendship
+            await _graphClient.Cypher
+                .Match("(u:User {userId: $currentUserId}), (f:User {userId: $friendId})")
+                .WithParams(new { currentUserId = currentUser.UserId, friendId = friend.UserId })
+                .Merge("(u)-[:FRIEND]->(f)")
+                .Merge("(f)-[:FRIEND]->(u)") // Bidirectional friendship
+                .ExecuteWithoutResultsAsync();
+
+            // Optionally update their in-memory `prijatelji` lists
+            currentUser.prijatelji ??= new List<User>();
+            friend.prijatelji ??= new List<User>();
+
+            if (!currentUser.prijatelji.Any(p => p.UserId == friend.UserId))
+                currentUser.prijatelji.Add(friend);
+
+            if (!friend.prijatelji.Any(p => p.UserId == currentUser.UserId))
+                friend.prijatelji.Add(currentUser);
+
+            return Ok(new { success = true, message = "Friend added successfully." });
+        }
+
+
+
+        [HttpGet("SearchUsernames")]
+        public async Task<IActionResult> SearchUsernames(string query)
+        {
             var users = await _graphClient.Cypher
                 .Match("(u:User)")
-                .Where("u.username CONTAINS $query")
+                .Where("toLower(u.username) CONTAINS toLower($query)")
                 .WithParam("query", query)
                 .Return(u => u.As<User>())
                 .ResultsAsync;
 
-            var usernames = users.Select(u => u.Username).ToList();
-            return Ok(usernames);
+            return Ok(users.Select(u => u.Username));
         }
-
 
 
         [HttpGet("AllUsers")]
@@ -442,6 +467,35 @@ namespace app.Controllers
                 return StatusCode(500, new { Error = ex.Message });
             }
         }
+
+
+        [HttpGet("GetFriends")]
+        public async Task<IActionResult> GetFriends(string userId)
+        {
+            try
+            {
+                // Query to get the friends of the specified user
+                var query = _graphClient.Cypher
+                    .Match("(u:User {userId: $userId})-[:FRIEND]->(f:User)")
+                    .WithParam("userId", userId)
+                    .Return(f => f.As<User>())
+                    .ResultsAsync;
+
+                var friends = await query;
+
+                if (friends == null || !friends.Any())
+                {
+                    return Ok(new List<User>());
+                }
+
+                return Ok(friends);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Error = ex.Message });
+            }
+        }
+
 
     }
 }

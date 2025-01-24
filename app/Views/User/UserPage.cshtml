@@ -70,17 +70,14 @@
                 <div class="col-12 col-md-6 mb-4">
                     <div class="friends-list">
                         <label class="form-label fw-bold">Friends:</label>
-                        <ul class="list-group">
-                            @foreach (var friend in Model.prijatelji ?? new List<User>())
-                            {
-                                <li class="list-group-item">@friend.FullName</li>
-                            }
+                        <ul class="list-group" id="friendsList">
+                            <!-- Friends will be dynamically loaded here -->
                         </ul>
                     </div>
                 </div>
 
                 <!-- Posts List -->
-                <div class="col-12 col-md-6">
+                <div class="col-12 col-md-6 mb-4">
                     <div class="posts-list">
                         <label class="form-label fw-bold">Posts:</label>
                         <ul class="list-group" id="postList">
@@ -89,7 +86,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+
     </main>
 
 
@@ -465,7 +462,7 @@
 
 
 
-    async function searchUsers() {
+        async function searchUsers() {
         const query = document.getElementById("searchBar").value;
 
         if (query.length === 0) {
@@ -484,20 +481,46 @@
 
             usernames.forEach(username => {
                 const listItem = document.createElement("li");
-                listItem.classList.add("list-group-item");
-                listItem.textContent = username;
+                listItem.classList.add("list-group-item", "d-flex", "justify-content-between", "align-items-center");
 
-                // Redirektuj na stranicu korisnika kada se klikne na njegovo ime
-                listItem.addEventListener('click', () => {
-                    window.location.href = `/User/UserPage/${usernames}`;
+                const userNameSpan = document.createElement("span");
+                userNameSpan.textContent = username;
+
+                const addButton = document.createElement("button");
+                addButton.classList.add("btn", "btn-success", "btn-sm");
+                addButton.textContent = "Add";
+
+                // Dodaj event listener za dugme "Add"
+                    addButton.addEventListener('click', async () => {
+                const loggedInUserId = '@Model.UserId'; // Replace this with the actual logged-in user ID
+
+                const addFriendResponse = await fetch(`/User/AddFriend?currentUserId=${loggedInUserId}&friendUsername=${username}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                 });
 
+                const result = await addFriendResponse.json();
+                if (result.success) {
+                    const addFriendModalLabel = document.getElementById("addFriendModalLabel");
+                    const modalInstance = bootstrap.Modal.getInstance(addFriendModalLabel);
+                    modalInstance.hide();
+                    alert('Friend added successfully!');
+                    loadFriends();
+                } else {
+                    alert('Failed to add friend: ' + result.message);
+                }
+            });
+
+
+                listItem.appendChild(userNameSpan);
+                listItem.appendChild(addButton);
                 userList.appendChild(listItem);
             });
         } else {
             userList.style.display = "none";
         }
     }
+
 
     function submitPost(event) {
         event.preventDefault(); // Prevent the default form behavior
@@ -575,6 +598,41 @@
             console.error("Error fetching posts:", error);
         }
     }
+
+    async function loadFriends() {
+    const userId = '@Model.UserId'; // This should be the logged-in user ID
+
+    try {
+        const response = await fetch(`/User/GetFriends?userId=${userId}`);
+        const friends = await response.json();
+
+        const friendsList = document.getElementById("friendsList");
+        friendsList.innerHTML = ''; // Clear any existing content
+
+        if (friends.length === 0) {
+            friendsList.innerHTML = "<li class='list-group-item'>No friends available.</li>";
+            return;
+        }
+
+        for (const friend of friends) {
+            const listItem = document.createElement("li");
+            listItem.classList.add("list-group-item", "d-flex", "justify-content-between", "align-items-center");
+
+            listItem.innerHTML = `
+                <span>${friend.fullName} (${friend.username})</span>
+                <div class="d-flex justify-content-between">
+                    <button class="btn btn-success btn-sm" onclick="removeFriend('${friend.UserId}')">Remove</button>
+                </div>
+            `;
+            friendsList.appendChild(listItem);
+        }
+    } catch (error) {
+        console.error("Error fetching friends:", error);
+    }
+}
+
+
+
 
     async function loadComments(postId) {
         try {
@@ -822,6 +880,7 @@
 
     // Call to load posts when the page is loaded
     document.addEventListener("DOMContentLoaded", loadPosts);
+    document.addEventListener("DOMContentLoaded", loadFriends);
 </script>
 <style>
     .profile-container {
