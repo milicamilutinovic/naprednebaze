@@ -13,6 +13,9 @@ public class Comment
     [JsonProperty("createdAt")]
     public DateTime? CreatedAt { get; set; }
 
+    public int LikeCount { get; set; }
+
+
     // Ove atribute možete ostaviti praznim ako nisu deo odgovora iz baze
     public User Author { get; set; }
     public Post Post { get; set; }

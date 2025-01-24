@@ -213,58 +213,60 @@ namespace app.Controllers
         }
 
         [HttpPost("LikeComment")]
-        public async Task<IActionResult> LikeComment([FromBody] LikeComment likeComment)
+        public async Task<IActionResult> LikeComment([FromBody] LikeRequest likeRequest)
         {
+            // Validacija ulaznih podataka
+            if (likeRequest == null || string.IsNullOrEmpty(likeRequest.UserId) || string.IsNullOrEmpty(likeRequest.CommentId))
+            {
+                return BadRequest("Invalid data.");
+            }
+
             try
             {
-                if (likeComment.UserId == null || likeComment.Comment == null)
-                {
-                    return BadRequest("User or Comment is missing.");
-                }
-
-                var parameters = new
-                {
-                    userId = likeComment.UserId,
-                    commentId = likeComment.Comment.CommentId
-                };
-
-                // Proveri da li je korisnik već lajkovao komentar
-                var alreadyLiked = await _graphClient.Cypher
-                    .Match("(u:User {userId: $userId})", "(c:Comment {commentId: $commentId})")
-                    .Where("(u)-[:LIKES]->(c)")
-                    .WithParams(parameters)
-                    .Return<int>("count(*)")
+                // Pronalaženje korisnika i komentara
+                var userNode = await _graphClient.Cypher
+                    .Match("(user:User)")
+                    .Where((User user) => user.UserId == likeRequest.UserId)
+                    .Return(user => user.As<User>())
                     .ResultsAsync;
 
-                bool isLiked = alreadyLiked.FirstOrDefault() > 0;
+                var commentNode = await _graphClient.Cypher
+                    .Match("(comment:Comment)")
+                    .Where((Comment comment) => comment.CommentId == likeRequest.CommentId)
+                    .Return(comment => comment.As<Comment>())
+                    .ResultsAsync;
 
-                if (isLiked)
+                if (userNode == null || commentNode == null)
                 {
-                    // Unlikuj komentar
-                    await _graphClient.Cypher
-                        .Match("(u:User {userId: $userId})-[r:LIKES]->(c:Comment {commentId: $commentId})")
-                        .WithParams(parameters)
-                        .Delete("r")
-                        .ExecuteWithoutResultsAsync();
-
-                    return Ok(new { success = true, isLiked = false });
+                    return NotFound("User or Comment not found.");
                 }
-                else
-                {
-                    // Lajkuj komentar
-                    await _graphClient.Cypher
-                        .Match("(u:User {userId: $userId})", "(c:Comment {commentId: $commentId})")
-                        .WithParams(parameters)
-                        .Create("(u)-[:LIKES]->(c)")
-                        .ExecuteWithoutResultsAsync();
 
-                    return Ok(new { success = true, isLiked = true });
-                }
+                // Dodavanje lajka (LIKES veza)
+                await _graphClient.Cypher
+                    .Match("(user:User)", "(comment:Comment)")
+                    .Where((User user) => user.UserId == likeRequest.UserId)
+                    .AndWhere((Comment comment) => comment.CommentId == likeRequest.CommentId)
+                    .Create("(user)-[:LIKES]->(comment)")
+                    .ExecuteWithoutResultsAsync();
+
+                // Opcionalno: Ažurirajte broj lajkova za komentar
+                await _graphClient.Cypher
+                    .Match("(comment:Comment)")
+                    .Where((Comment comment) => comment.CommentId == likeRequest.CommentId)
+                    .Set("comment.likeCount = coalesce(comment.likeCount, 0) + 1")
+                    .ExecuteWithoutResultsAsync();
+
+                return Ok(new { message = "Komentar lajkovan" });
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
-                return StatusCode(500, new { Error = ex.Message });
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
+        }
+        public class LikeRequest
+        {
+            public string UserId { get; set; }
+            public string CommentId { get; set; }
         }
 
         //[HttpPost("LikeComment")]

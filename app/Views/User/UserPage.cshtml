@@ -727,7 +727,7 @@
                         ${isAuthor ? `
                     <button class="btn btn-warning btn-sm" onclick="openEditCommentModal('${comment.commentId}', '${comment.content.replace(/'/g, "\\'")}')">Edit</button>
                     ` : ''}
-                          <button id="likeButtonComment-${comment.commentId}" class="btn btn-light btn-sm" onclick="likeComment('${comment.commentId}')">
+                                    <button id="likeButtonComment-${comment.commentId}" class="btn btn-light btn-sm" onclick="likeComment('${comment.commentId}')">
                     Like
                 </button>
                 <span id="likeCountComment-${comment.commentId}">${comment.likeCount}</span>
@@ -979,69 +979,49 @@
                 console.error("Error liking post:", error.message);
             });
     }
-    function likeComment(commentId) {
-        const button = document.querySelector(`#likeButtonComment-${commentId}`);
-        const isLiked = button.classList.contains("liked"); // Proverava da li je komentar već lajkovan
 
-        // Pripremite podatke za slanje
-        const user = {
-            UserId: currentUserId, // Trenutni korisnik
-            ProfilePicture: "" // Možete dodati sliku profila ako je potrebno
-        };
 
-        // Pronađite komentar u listi komentara
-       // const comment = comments.find(c => c.commentId === commentId);
-
-        // Proverite ako komentar postoji
-        if (!comment) {
-            console.error("Komentar nije pronađen.");
-            return;
-        }
-
-        const post = { PostId: comment.postId }; // ID posta na kojem je komentar
-
-        const commentData = {
-            Comment: {
-                commentId: commentId,
-                post: post,
-                author: comment.authorName,
-                content: comment.content
-            },
-            User: user
-        };
-
-        fetch(`/Comment/LikeComment`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(commentData)
-        })
-            .then(response => {
-                if (!response.ok) {
-                    return response.text().then(text => {
-                        throw new Error(`Server error: ${text}`);
-                    });
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    // Ažuriraj prikaz broja lajkova
-                    button.classList.toggle("liked", !isLiked); // Dodaj/ukloni klasu "liked"
-
-                    const likeCountElement = document.querySelector(`#likeCountComment-${commentId}`);
-                    if (likeCountElement) {
-                        likeCountElement.textContent = data.likeCount;
-                    }
-                } else {
-                    alert("Failed to like comment: " + (data.error || "Unknown error"));
-                }
-            })
-            .catch(error => {
-                console.error("Error liking comment:", error.message);
+    async function likeComment(commentId) {
+        try {
+            const response = await fetch(`/Comment/LikeComment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    UserId: currentUserId,
+                    CommentId: commentId
+                })
             });
+
+            const rawResponse = await response.text();
+            console.log('Raw response:', rawResponse);
+
+            let result;
+            try {
+                result = JSON.parse(rawResponse);
+            } catch (parseError) {
+                console.error('Failed to parse response as JSON:', parseError);
+                alert('Greška prilikom učitavanja odgovora od servera');
+                return;
+            }
+
+            if (response.ok) {
+                // Ažuriraj prikazani like count
+                const likeCountElement = document.getElementById(`likeCountComment-${commentId}`);
+                if (likeCountElement) {
+                    likeCountElement.textContent = result.likeCount;
+                }
+            } else {
+                console.error('Greška pri lajkovanju komentara:', result);
+                alert(result.message);
+            }
+
+        } catch (error) {
+            console.error('Error liking comment:', error);
+        }
     }
+
 
 
     function unlikePost(postId) {
