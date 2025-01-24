@@ -27,7 +27,6 @@ namespace app.Controllers
         // POST: /Comment
         [HttpPost]
         [HttpPost("AddComment")]
-
         public async Task<IActionResult> AddComment([FromBody] Comment comment)
         {
             try
@@ -39,6 +38,7 @@ namespace app.Controllers
                 {
                     return BadRequest("Author UserId and PostId are required.");
                 }
+
                 var loggedInUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
                 comment.Author = new User { UserId = loggedInUserId };
 
@@ -64,13 +64,15 @@ namespace app.Controllers
                     return NotFound(new { Message = "Author or Post not found." });
                 }
 
-                // Kreiraj komentar i poveži ga sa korisnikom i postom
+                // Generiši CommentId ako nije prosleđen
                 if (string.IsNullOrEmpty(comment.CommentId))
                 {
-                    comment.CommentId = Guid.NewGuid().ToString();  // Generišite CommentId ako nije prosleđen
+                    comment.CommentId = Guid.NewGuid().ToString();
                 }
+
                 var createdAt = DateTime.UtcNow;
 
+                // Kreiraj komentar i poveži ga sa korisnikom i postom
                 await _graphClient.Cypher
                     .Match("(u:User {userId: $authorId})", "(p:Post {postId: $postId})")
                     .WithParams(new
@@ -86,6 +88,10 @@ namespace app.Controllers
                     .Create("(c)-[:BELONGS_TO]->(p)")
                     .ExecuteWithoutResultsAsync();
 
+                Console.WriteLine($"CommentId: {comment.CommentId}");
+                Console.WriteLine($"Content: {comment.Content}");
+                Console.WriteLine($"AuthorId: {comment.Author?.UserId}");
+                Console.WriteLine($"PostId: {comment.Post?.postId}");
                 return Ok(new
                 {
                     Message = "Comment created successfully.",
@@ -98,6 +104,9 @@ namespace app.Controllers
                         PostId = comment.Post.postId
                     }
                 });
+
+               
+
             }
             catch (Exception ex)
             {
@@ -161,6 +170,159 @@ namespace app.Controllers
             }
         }
 
+        [HttpPut("EditComment/{commentId}")]
+        public async Task<IActionResult> EditComment(string commentId, [FromBody] string content)
+        {
+            try
+            {
+                // Proveri da li je sadržaj validan
+                if (string.IsNullOrEmpty(content))
+                {
+                    return BadRequest(new { Message = "Content is required." });
+                }
+
+                // Proveri da li komentar sa zadatim ID-jem postoji
+                var existingComment = await _graphClient.Cypher
+                    .Match("(c:Comment {commentId: $commentId})")
+                    .WithParam("commentId", commentId)
+                    .Return(c => c.As<Comment>())
+                    .ResultsAsync;
+
+                if (existingComment == null || !existingComment.Any())
+                {
+                    return NotFound(new { Message = "Comment not found." });
+                }
+
+                // Ažuriraj sadržaj komentara
+                await _graphClient.Cypher
+                    .Match("(c:Comment {commentId: $commentId})")
+                    .Set("c.content = $content")
+                    .WithParams(new
+                    {
+                        commentId = commentId,
+                        content = content
+                    })
+                    .ExecuteWithoutResultsAsync();
+
+                return Ok(new { Message = "Comment updated successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Error = ex.Message });
+            }
+        }
+
+        [HttpPost("LikeComment")]
+        public async Task<IActionResult> LikeComment([FromBody] LikeComment likeComment)
+        {
+            try
+            {
+                if (likeComment.UserId == null || likeComment.Comment == null)
+                {
+                    return BadRequest("User or Comment is missing.");
+                }
+
+                var parameters = new
+                {
+                    userId = likeComment.UserId,
+                    commentId = likeComment.Comment.CommentId
+                };
+
+                // Proveri da li je korisnik već lajkovao komentar
+                var alreadyLiked = await _graphClient.Cypher
+                    .Match("(u:User {userId: $userId})", "(c:Comment {commentId: $commentId})")
+                    .Where("(u)-[:LIKES]->(c)")
+                    .WithParams(parameters)
+                    .Return<int>("count(*)")
+                    .ResultsAsync;
+
+                bool isLiked = alreadyLiked.FirstOrDefault() > 0;
+
+                if (isLiked)
+                {
+                    // Unlikuj komentar
+                    await _graphClient.Cypher
+                        .Match("(u:User {userId: $userId})-[r:LIKES]->(c:Comment {commentId: $commentId})")
+                        .WithParams(parameters)
+                        .Delete("r")
+                        .ExecuteWithoutResultsAsync();
+
+                    return Ok(new { success = true, isLiked = false });
+                }
+                else
+                {
+                    // Lajkuj komentar
+                    await _graphClient.Cypher
+                        .Match("(u:User {userId: $userId})", "(c:Comment {commentId: $commentId})")
+                        .WithParams(parameters)
+                        .Create("(u)-[:LIKES]->(c)")
+                        .ExecuteWithoutResultsAsync();
+
+                    return Ok(new { success = true, isLiked = true });
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Error = ex.Message });
+            }
+        }
+
+        //[HttpPost("LikeComment")]
+        //public async Task<IActionResult> LikeComment([FromBody] Like like)
+        //{
+        //    try
+        //    {
+        //        if (like.user == null || like.comment == null)
+        //        {
+        //            return BadRequest("User or Comment is missing.");
+        //        }
+
+        //        var userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+
+        //        var parameters = new
+        //        {
+        //            userId,
+        //            commentId = like.comment.CommentId
+        //        };
+
+        //        // Proveri da li je korisnik već lajkovao komentar
+        //        var alreadyLiked = await _graphClient.Cypher
+        //            .Match("(u:User {userId: $userId})", "(c:Comment {commentId: $commentId})")
+        //            .Where("(u)-[:LIKES]->(c)")
+        //            .WithParams(parameters)
+        //            .Return<int>("count(*)")
+        //            .ResultsAsync;
+        //        bool isLiked = alreadyLiked.FirstOrDefault() > 0;
+
+        //        // Ako je komentar već lajkovan, unlikuj ga
+        //        if (alreadyLiked.FirstOrDefault() > 0)
+        //        {
+        //            // Pozovi logiku za unlikovanje
+        //            await _graphClient.Cypher
+        //                .Match("(u:User {userId: $userId})-[r:LIKES]->(c:Comment {commentId: $commentId})")
+        //                .WithParams(parameters)
+        //                .Delete("r") // Briši relaciju LAJK
+        //                .ExecuteWithoutResultsAsync();
+
+        //            return Ok(new { success = true, isLiked });
+        //        }
+        //        else
+        //        {
+        //            // Ako komentar nije lajkovan, lajkuj ga
+        //            await _graphClient.Cypher
+        //                .Match("(u:User {userId: $userId})", "(c:Comment {commentId: $commentId})")
+        //                .WithParams(parameters)
+        //                .Create("(u)-[:LIKES]->(c)") // Kreiraj LAJK relaciju
+        //                .ExecuteWithoutResultsAsync();
+
+        //            return Ok(new { success = true, isLiked });
+        //        }
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return StatusCode(500, new { Error = ex.Message });
+        //    }
+        //}
 
 
         //da se proveri ova get metoda, varaca mi 404, a u bazi posotij taj podatak
@@ -251,11 +413,13 @@ namespace app.Controllers
 
 
 
-        [HttpDelete("{id}")]
+        [HttpDelete("DeleteComment/{id}")]
         public async Task<IActionResult> DeleteComment(string id)
         {
             try
             {
+                Console.WriteLine($"Attempting to delete comment with ID: {id}");
+
                 // Cypher query to delete the comment
                 await _graphClient.Cypher
                     .Match("(c:Comment {commentId: $commentId})")
@@ -268,10 +432,13 @@ namespace app.Controllers
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Error occurred while deleting comment with ID: {id}. Error: {ex.Message}");
+
                 // Handle errors
-                return StatusCode(500, new { Error = ex.Message });
+                return StatusCode(500, new { Error = ex.Message, StackTrace = ex.StackTrace });
             }
         }
+
 
     }
 }
