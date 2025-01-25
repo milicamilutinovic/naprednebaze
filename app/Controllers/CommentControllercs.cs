@@ -140,7 +140,7 @@ namespace app.Controllers
                 foreach (var result in commentsQuery)
                 {
                     Console.WriteLine($"CommentId: {result.Comment.CommentId}, Content: {result.Comment.Content}");
-                    Console.WriteLine($"AuthorName: {result.Author.FullName}");
+                    Console.WriteLine($"AuthorName: {result.Author.Username}");
                 }
 
                 // Proveri da li ima komentara
@@ -156,7 +156,7 @@ namespace app.Controllers
                     CommentId = c.Comment.CommentId,
                     Content = c.Comment.Content,
                     CreatedAt = c.Comment.CreatedAt?.ToString("o") ?? "No Date",
-                    AuthorName = c.Author.FullName
+                    AuthorName = c.Author.Username
                 }).ToList();
 
                 // Ispis broja pronađenih komentara
