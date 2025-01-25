@@ -13,6 +13,7 @@ public class Comment
     [JsonProperty("createdAt")]
     public DateTime? CreatedAt { get; set; }
 
+    [JsonProperty("likeCount")]
     public int LikeCount { get; set; }
 
 

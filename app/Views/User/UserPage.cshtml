@@ -166,7 +166,7 @@
                 <form method="post" action="@Url.Action("AddPost", "PostController")" enctype="multipart/form-data" id="addPostForm" onsubmit="submitPost(event)">
                     <div class="mb-3">
                         <label for="image" class="form-label">Choose Image</label>
-                        <input type="file" class="form-control" id="imageURL" name="imageURL" accept="image/*" required />
+                        <input type="file" class="form-control" id="imageURL" name="imageURL" accept="image" required />
                     </div>
                     <div class="mb-3">
                         <label for="caption" class="form-label">Post Caption</label>
@@ -494,7 +494,7 @@
 
 
 
-        async function searchUsers() {
+           async function searchUsers() {
         const query = document.getElementById("searchBar").value;
 
         if (query.length === 0) {
@@ -517,36 +517,36 @@
 
                 const userNameSpan = document.createElement("span");
                 userNameSpan.textContent = username;
-               
+
                 const addButton = document.createElement("button");
                 addButton.classList.add("btn", "btn-success", "btn-sm");
                 addButton.textContent = "Add";
 
-                // Dodaj event listener za dugme "Add"
-                    addButton.addEventListener('click', async () => {
-                const loggedInUserId = '@Model.UserId'; // Replace this with the actual logged-in user ID
-                    userList.appendChild(listItem);
+                addButton.addEventListener('click', async () => {
+                    const loggedInUserId = '@Model.UserId'; // Replace this with actual user ID
 
-                const addFriendResponse = await fetch(`/User/AddFriend?currentUserId=${loggedInUserId}&friendUsername=${username}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    const addFriendResponse = await fetch(`/User/AddFriend?currentUserId=${loggedInUserId}&friendUsername=${username}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                    });
+
+                    const result = await addFriendResponse.json();
+                    if (result.success) {
+                        // Hide modal
+                        const addFriendModal = document.getElementById("addFriendModal");
+                        const modalInstance = bootstrap.Modal.getInstance(addFriendModal);
+                        modalInstance.hide();
+
+                        // Show success message
+                        alert('Friend added successfully!');
+
+                        // Refresh friends list
+                        await loadFriends();
+                    } else {
+                        alert('Failed to add friend: ' + result.message);
+                    }
                 });
 
-                const result = await addFriendResponse.json();
-                if (result.success) {
-                    const addFriendModalLabel = document.getElementById("addFriendModalLabel");
-                    const modalInstance = bootstrap.Modal.getInstance(addFriendModalLabel);
-                    modalInstance.hide();
-                    alert('Friend added successfully!');
-                    loadFriends();
-                } else {
-                    alert('Failed to add friend: ' + result.message);
-                }
-            });
-
-                listItem.addEventListener('click', () => {
-                    window.location.href = `/User/UserPage/${username}`;
-                });
                 listItem.appendChild(userNameSpan);
                 listItem.appendChild(addButton);
                 userList.appendChild(listItem);
@@ -656,7 +656,7 @@
             listItem.innerHTML = `
                 <span>${friend.fullName} (${friend.username})</span>
                 <div class="d-flex justify-content-between">
-                    <button class="btn btn-success btn-sm" onclick="removeFriend('${friend.UserId}')">Remove</button>
+                       <button class="btn btn-success btn-sm" onclick="removeFriend('${friend.userId}')">Remove</button>
                 </div>
             `;
             friendsList.appendChild(listItem);
@@ -666,6 +666,29 @@
     }
 }
 
+    async function removeFriend(friendId) {
+        const currentUserId = '@Model.UserId'; // Logged-in user ID
+
+        try {
+                       const response = await fetch(`/User/RemoveFriend?currentUserId=${currentUserId}&friendId=${friendId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+    });
+
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                alert("Friend removed successfully.");
+                loadFriends(); // Refresh the friends list
+            } else {
+                alert(result.message || "An error occurred while removing the friend.");
+            }
+        } catch (error) {
+            console.error("Error removing friend:", error);
+            alert("An error occurred while removing the friend.");
+        }
+    }
 
 
 
@@ -730,7 +753,7 @@
                                     <button id="likeButtonComment-${comment.commentId}" class="btn btn-light btn-sm" onclick="likeComment('${comment.commentId}')">
                     Like
                 </button>
-                <span id="likeCountComment-${comment.commentId}">${comment.likeCount}</span>
+                    <span id="likeCountComment-${comment.commentId}">${comment.likeCount}</span>
                     ${isAuthor ? `
             <button class="btn btn-danger btn-sm" onclick="removeComment('${comment.commentId}')">Remove</button>
         ` : ''}
@@ -1097,7 +1120,7 @@
         background-color: transparent;
         border: none;
         font-size: 1.5rem;
-        color: #ccc; /* Sivo za nelajkovano srce */
+        color: #ccc; /* Sivo za nelajkovano srce
         cursor: pointer;
         transition: color 0.3s ease;
     }

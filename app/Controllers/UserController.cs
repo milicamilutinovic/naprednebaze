@@ -496,6 +496,47 @@ namespace app.Controllers
             }
         }
 
+        [HttpPost("RemoveFriend")]
+        public async Task<IActionResult> RemoveFriend(string currentUserId, string friendId)
+        {
+            try
+            {
+                Console.WriteLine($"currentUserId: {currentUserId}, friendId: {friendId}");
+
+                var existingFriendship = await _graphClient.Cypher
+                    .Match("(u:User {userId: $currentUserId})-[r:FRIEND]->(f:User {userId: $friendId})")
+                    .WithParams(new { currentUserId, friendId })
+                    .Return(r => r.As<object>())
+                    .ResultsAsync;
+
+                Console.WriteLine($"existingFriendship count: {existingFriendship.Count()}");
+
+
+                if (!existingFriendship.Any())
+                {
+                    return BadRequest(new { success = false, message = "Friendship does not exist." });
+                }
+
+                // Remove the bidirectional FRIEND relationship
+                await _graphClient.Cypher
+                    .Match("(u:User {userId: $currentUserId})-[r:FRIEND]->(f:User {userId: $friendId})")
+                    .WithParams(new { currentUserId, friendId })
+                    .Delete("r")
+                    .ExecuteWithoutResultsAsync();
+
+                await _graphClient.Cypher
+                    .Match("(f:User {userId: $friendId})-[r:FRIEND]->(u:User {userId: $currentUserId})")
+                    .WithParams(new { currentUserId, friendId })
+                    .Delete("r")
+                    .ExecuteWithoutResultsAsync();
+
+                return Ok(new { success = true, message = "Friend removed successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { Error = ex.Message });
+            }
+        }
 
     }
 }
