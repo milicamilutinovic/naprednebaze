@@ -69,12 +69,17 @@
                 <!-- Friends List -->
                 <div class="col-12 col-md-6 mb-4">
                     <div class="friends-list">
-                        <label class="form-label fw-bold">Friends:</label>
-                        <ul class="list-group" id="friendsList">
+                        <label class="form-label fw-bold">
+                            Friends: <span id="friendsCount" style="cursor: pointer;" onclick="toggleFriendsList()">(<span id="friendsCountNumber">0</span>)</span>
+                        </label>
+                        <ul class="list-group" id="friendsList" style="display: none;">
                             <!-- Friends will be dynamically loaded here -->
                         </ul>
                     </div>
                 </div>
+            </div>
+
+
 
                 <!-- Posts List -->
                 <div class="col-12 col-md-6 mb-4">
@@ -634,37 +639,62 @@
         }
     }
 
+    let friendsLoaded = false;  // Flag to check if friends are already loaded
+
     async function loadFriends() {
-    const userId = '@Model.UserId'; // This should be the logged-in user ID
+        const userId = '@Model.UserId'; // This should be the logged-in user ID
 
-    try {
-        const response = await fetch(`/User/GetFriends?userId=${userId}`);
-        const friends = await response.json();
+        try {
+            const response = await fetch(`/User/GetFriends?userId=${userId}`);
+            const friends = await response.json();
 
-        const friendsList = document.getElementById("friendsList");
-        friendsList.innerHTML = ''; // Clear any existing content
+            const friendsList = document.getElementById("friendsList");
+            const friendsCountNumber = document.getElementById("friendsCountNumber");
+            friendsList.innerHTML = ''; // Clear any existing content
 
-        if (friends.length === 0) {
-            friendsList.innerHTML = "<li class='list-group-item'>No friends available.</li>";
-            return;
+            // Update the friends count
+            friendsCountNumber.innerText = friends.length;
+
+            if (friends.length === 0) {
+                friendsList.innerHTML = "<li class='list-group-item'>No friends available.</li>";
+                return;
+            }
+
+            for (const friend of friends) {
+                const listItem = document.createElement("li");
+                listItem.classList.add("list-group-item", "d-flex", "justify-content-between", "align-items-center");
+
+                listItem.innerHTML = `
+                    <span>
+                        <a href="/User/UserPage/${friend.username}" class="text-decoration-none">${friend.fullName} (${friend.username})</a>
+                    </span>
+                    <div class="d-flex justify-content-between">
+                        <button class="btn btn-success btn-sm" onclick="removeFriend('${friend.userId}')">Remove</button>
+                    </div>
+                `;
+                friendsList.appendChild(listItem);
+            }
+        } catch (error) {
+            console.error("Error fetching friends:", error);
         }
-
-        for (const friend of friends) {
-            const listItem = document.createElement("li");
-            listItem.classList.add("list-group-item", "d-flex", "justify-content-between", "align-items-center");
-
-            listItem.innerHTML = `
-                <span>${friend.fullName} (${friend.username})</span>
-                <div class="d-flex justify-content-between">
-                       <button class="btn btn-success btn-sm" onclick="removeFriend('${friend.userId}')">Remove</button>
-                </div>
-            `;
-            friendsList.appendChild(listItem);
-        }
-    } catch (error) {
-        console.error("Error fetching friends:", error);
     }
-}
+
+    function toggleFriendsList() {
+        const friendsList = document.getElementById("friendsList");
+
+        // If the friends list is not yet loaded, load it
+        if (!friendsLoaded) {
+            loadFriends();
+            friendsLoaded = true;  // Set the flag to true after loading the friends
+        }
+
+        // Toggle visibility of the friends list
+        if (friendsList.style.display === "none") {
+            friendsList.style.display = "block";  // Show the list
+        } else {
+            friendsList.style.display = "none";   // Hide the list
+        }
+    }
 
     async function removeFriend(friendId) {
         const currentUserId = '@Model.UserId'; // Logged-in user ID
